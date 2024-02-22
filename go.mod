@@ -1,6 +1,6 @@
 module terraform-provider-mssqlpermissions
 
-go 1.23
+go 1.22
 
 require (
 	github.com/hashicorp/terraform-plugin-docs v0.16.0
