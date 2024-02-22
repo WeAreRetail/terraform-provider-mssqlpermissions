@@ -1,0 +1,67 @@
+{
+  "name": "Terraform Provider - MSSQL",
+  "dockerComposeFile": ["docker-compose.yml"],
+
+  // The 'service' property is the name of the service for the container that VS Code should
+  // use. Update this value and .devcontainer/docker-compose.yml to the real service name.
+  "service": "terraform-mssql-provider",
+  // The optional 'workspaceFolder' property is the path VS Code should open by default when
+  // connected. This is typically a file mount in .devcontainer/docker-compose.yml
+  "workspaceFolder": "/workspace/terraform-provider-mssqlpermissions",
+  "postCreateCommand": {
+    "ssh": "mkdir -p /home/vscode/.ssh && cp -r /home/vscode/.ssh-localhost/* /home/vscode/.ssh && chmod 700 /home/vscode/.ssh && chmod 600 /home/vscode/.ssh/*",
+    "db": "bash .devcontainer/mssql/postCreateCommand.sh 'P@ssw0rd' './bin/Debug/' './.devcontainer/mssql/'",
+    "cspell": "npm install -g cspell@latest"
+  },
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/powershell:1": {},
+    // node feature allow cspell installation
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/terraform:1": {
+      "version": "latest",
+      "tflint": "latest",
+      "terragrunt": "none"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "files.eol": "\n",
+        "terminal.integrated.shell.linux": "/bin/bash",
+        "mssql.connections": [
+          {
+            "server": "127.0.0.1",
+            "database": "",
+            "authenticationType": "SqlLogin",
+            "user": "sa",
+            "password": "P@ssw0rd",
+            "emptyPasswordInput": false,
+            "savePassword": true,
+            "profileName": "mssql-container",
+            "trustServerCertificate": true
+          }
+        ]
+      },
+      "extensions": [
+        "1nVitr0.blocksort",
+        "davidanson.vscode-markdownlint",
+        "eamodio.gitlens",
+        "esbenp.prettier-vscode",
+        "golang.go",
+        "hashicorp.terraform",
+        "ms-azuretools.vscode-docker",
+        "ms-mssql.mssql",
+        "ms-vscode.powershell",
+        "redhat.vscode-yaml",
+        "streetsidesoftware.code-spell-checker",
+        "task.vscode-task",
+        "yzhang.markdown-all-in-one"
+      ]
+    }
+  }
+}

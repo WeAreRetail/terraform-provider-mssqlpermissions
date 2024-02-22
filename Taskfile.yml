@@ -1,0 +1,117 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+# https://taskfile.dev
+
+version: '3'
+
+env:
+  LOCAL_SQL_PASSWORD: P@ssw0rd
+
+dotenv: ['.env', '.local.env', '.azure.env']
+
+tasks:
+  # Rebuild and start the MSSQL docker image.
+  local-docker-compose-up:
+    desc: Rebuild and start the MSSQL docker image.
+    aliases: [dup]
+    dir: fixtures/local
+    cmds:
+      - docker-compose up --force-recreate --wait --detach
+    silent: true
+
+  # Create the database on the fixture mssql
+  local-mssql-ready:
+    desc: Create the database on the fixture mssql.
+    aliases: [lsql]
+    dir: fixtures/local
+    cmds:
+      - task: local-docker-compose-up
+      - bash ./postCreateCommand.sh ${LOCAL_SQL_PASSWORD} '.' '.'
+      - echo -e "export TF_ACC=1\nexport LOCAL_TEST=1\nexport LOCAL_MSSQL_DATABASE='ApplicationDB'\nexport LOCAL_MSSQL_USERNAME='sa'\nexport LOCAL_MSSQL_PASSWORD='${LOCAL_SQL_PASSWORD}'\nexport LOCAL_MSSQL_SERVER='mssql-fixture'" > ../../.local.env
+      - task: merge-dotenv-files
+    silent: true
+
+  # Shutdown the MSSQL docker image.
+  local-docker-compose-down:
+    desc: Shutdown the MSSQL docker image.
+    aliases: [ddown]
+    dir: fixtures/local
+    cmds:
+      - docker-compose down
+    silent: true
+
+  # Apply the terraform fixture. It creates an Azure Database and required SPNs
+  terraform-up:
+    desc: Apply the terraform fixture. It creates an Azure Database and required SPNs
+    aliases: [tfup]
+    dir: fixtures/azure
+    cmds:
+      - terraform init -upgrade
+      - terraform apply -auto-approve
+      - task: merge-dotenv-files
+    silent: true
+
+  # Destroy the terraform fixture.
+  terraform-down:
+    desc: Destroy the terraform fixture.
+    aliases: [tfdown]
+    dir: fixtures/azure
+    cmds:
+      - terraform destroy -auto-approve
+    silent: true
+
+  # Apply the terraform fixture without initializing terraform first.
+  terraform-apply:
+    desc: Apply the terraform fixture without initializing terraform first.
+    aliases: [tfa]
+    dir: fixtures/azure
+    cmds:
+      - terraform apply -auto-approve
+      - task: merge-dotenv-files
+    silent: true
+    
+  # Reset Azure SQL Database and server by tainted them.
+  terraform-reset-azure-db:
+    desc: Reset Azure SQL Database and server by tainted them.
+    aliases: [tfradb]
+    dir: fixtures/azure
+    cmds:
+      - terraform taint azurerm_mssql_server.sql_server
+      - terraform taint azurerm_mssql_database.db
+      - terraform apply -auto-approve
+      - task: merge-dotenv-files
+    silent: true
+
+  # Merge environment variables
+  merge-dotenv-files:
+    desc: Merge environment variables
+    dir: "."
+    cmds:
+      - cat .local.env .azure.env > .tests.env
+      - sed 's/export //g' .tests.env > .vscode-test.env
+    silent: true
+
+  # Reset the local fixture database and run tests
+  go-test-queries-local:
+    desc: Reset the local fixture database and run tests.
+    aliases: [gtql]
+    dir: queries
+    cmds:
+      - task: local-mssql-ready
+      - go test -v
+
+  # Reset the local fixture database and run tests
+  go-test-queries-azure:
+    desc: Reset the local fixture database and run tests.
+    aliases: [gtqa]
+    dir: queries
+    cmds:
+      - task: terraform-reset-db
+      - go test -v
+
+  # Launch all test
+  go-test-all:
+    desc: Launch all test
+    aliases: [gta]
+    dir: queries
+    cmds:
+      - go test -v

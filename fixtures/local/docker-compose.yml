@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  mssql-fixture:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:1434:1433'
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=${LOCAL_SQL_PASSWORD}
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$${SA_PASSWORD}" -Q "SELECT 1" -b -o /dev/null
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - fixture_network
+
+networks:
+  fixture_network:
+    name: dev_network
+    external: true

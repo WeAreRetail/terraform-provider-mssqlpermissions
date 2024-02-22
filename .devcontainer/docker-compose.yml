@@ -1,0 +1,45 @@
+version: '3.8'
+services:
+  # Update this to the name of the service you want to work with in your docker-compose.yml file
+  terraform-mssql-provider:
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    volumes:
+      - ..:/workspace/terraform-provider-mssqlpermissions
+      - ~/.ssh:/home/vscode/.ssh-localhost:ro
+
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp:unconfined
+
+    networks:
+      - network
+
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:1433:1433'
+    networks:
+      - network
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=P@ssw0rd
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$${SA_PASSWORD}" -Q "SELECT 1" -b -o /dev/null
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+networks:
+  network:
+    driver: bridge
+    name: dev_network
