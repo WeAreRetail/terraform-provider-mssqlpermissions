@@ -5,6 +5,7 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -46,8 +47,8 @@ func testAccDatabaseRoleResourceConfigLocalSQL(name string, member string) strin
 	return fmt.Sprintf(`
 resource "mssqlpermissions_database_role" "test" {
 	config = {
-		server_fqdn   = "mssql-fixture"
-		server_port   = 1433
+		server_fqdn   = %q
+		server_port   = %q
 		database_name = "ApplicationDB"
 	
 		sql_login = {
@@ -59,10 +60,13 @@ resource "mssqlpermissions_database_role" "test" {
 	name     = %q
 	members  = [%s]
 }
-`, name, member)
+`, os.Getenv("LOCAL_SQL_HOST"), os.Getenv("LOCAL_SQL_PORT"), name, member)
 }
 
 func TestAccDatabaseRoleResourceAzure(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip()
+	}
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,

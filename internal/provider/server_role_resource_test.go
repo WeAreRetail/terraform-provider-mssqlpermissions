@@ -5,6 +5,7 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -46,8 +47,8 @@ func testAccServerRoleResourceConfigLocalSQL(name string, member string) string 
 	return fmt.Sprintf(`
 resource "mssqlpermissions_server_role" "test" {
 	config = {
-		server_fqdn   = "mssql-fixture"
-		server_port   = 1433
+		server_fqdn   = %q
+		server_port   = %q
 		database_name = "master"
 	
 		sql_login = {
@@ -59,5 +60,5 @@ resource "mssqlpermissions_server_role" "test" {
 	name     = %q
 	members  = [%s]
 }
-`, name, member)
+`, os.Getenv("LOCAL_SQL_HOST"), os.Getenv("LOCAL_SQL_PORT"), name, member)
 }

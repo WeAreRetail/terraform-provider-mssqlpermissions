@@ -9,6 +9,15 @@ env:
 dotenv: ['.env', '.local.env', '.azure.env']
 
 tasks:
+
+  create-env-files:
+    desc: Create all env files that are necessary
+    aliases:
+      - "cef"
+    cmds:
+      - touch .env .local.env .azure.env
+    silent: true
+
   # Rebuild and start the MSSQL docker image.
   local-docker-compose-up:
     desc: Rebuild and start the MSSQL docker image.
@@ -30,6 +39,36 @@ tasks:
       - task: merge-dotenv-files
     silent: true
 
+    # Create the database on the fixture mssql
+  local-mssql-ci-ready:
+    desc: Create the database on the fixture mssql.
+    aliases: [cilsql]
+    dir: fixtures/local
+    cmds:
+      - task: create-env-files
+      - docker compose -f docker-compose-ci.yml up --force-recreate --wait --detach
+      - bash ./postCreateCommand.sh ${LOCAL_SQL_PASSWORD} '.' '.' localhost 1434
+      - echo -e "export TF_ACC=1\nexport LOCAL_TEST=1\nexport LOCAL_MSSQL_DATABASE='ApplicationDB'\nexport LOCAL_MSSQL_USERNAME='sa'\nexport LOCAL_MSSQL_PASSWORD='${LOCAL_SQL_PASSWORD}'\nexport LOCAL_MSSQL_SERVER='mssql-fixture'" > ../../.local.env
+      - task: merge-dotenv-files
+    silent: true
+
+  test-internal-provider:
+    desc: Launch tests on internal provider for the local environment
+    env:
+      LOCAL_SQL_HOST: mssql-fixture
+      LOCAL_SQL_PORT: 1433
+    cmds:
+      - go test -v -cover ./internal/provider/
+
+  test-internal-provider-ci:
+    desc: Launch tests on internal provider for the CI
+    env:
+      CI: true
+      LOCAL_SQL_HOST: localhost
+      LOCAL_SQL_PORT: 1434
+    cmds:
+      - go test -v -cover ./internal/provider/
+
   # Shutdown the MSSQL docker image.
   local-docker-compose-down:
     desc: Shutdown the MSSQL docker image.
@@ -37,6 +76,15 @@ tasks:
     dir: fixtures/local
     cmds:
       - docker-compose down
+    silent: true
+
+    # Shutdown the MSSQL docker image.
+  local-ci-docker-compose-down:
+    desc: Shutdown the MSSQL docker image.
+    aliases: [ciddown]
+    dir: fixtures/local
+    cmds:
+      - docker-compose -f docker-compose-ci.yml down
     silent: true
 
   # Apply the terraform fixture. It creates an Azure Database and required SPNs
@@ -105,7 +153,7 @@ tasks:
     aliases: [gtqa]
     dir: queries
     cmds:
-      - task: terraform-reset-db
+      - task: terraform-reset-azure-db
       - go test -v
 
   # Launch all test

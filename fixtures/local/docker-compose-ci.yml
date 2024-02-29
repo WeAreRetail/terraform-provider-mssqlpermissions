@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  mssql-fixture:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mssql-fixture
+    restart: unless-stopped
+    ports:
+      - '0.0.0.0:1434:1433'
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=P@ssw0rd
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$${SA_PASSWORD}" -Q "SELECT 1" -b -o /dev/null
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - fixture_network
+
+networks:
+  fixture_network:
+    driver: bridge
+    name: fixture_network

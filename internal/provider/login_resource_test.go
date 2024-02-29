@@ -5,6 +5,7 @@ package provider
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -40,8 +41,8 @@ func testAccLoginResourceConfig(name string, password string) string {
 	return fmt.Sprintf(`
 resource "mssqlpermissions_login" "test" {
 	config = {
-		server_fqdn   = "mssql-fixture"
-		server_port   = 1433
+		server_fqdn   = %q
+		server_port   = %q
 		database_name = "master"
 	
 		sql_login = {
@@ -53,5 +54,5 @@ resource "mssqlpermissions_login" "test" {
 	name     = %q
 	password = %q
 }
-`, name, password)
+`, os.Getenv("LOCAL_SQL_HOST"), os.Getenv("LOCAL_SQL_PORT"), name, password)
 }
