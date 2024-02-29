@@ -4,11 +4,13 @@ sqlfiles="false"
 SApassword=$1
 dacpath=$2
 sqlpath=$3
+host=${4:-mssql-fixture}
+port=${5:-1433}
 
 echo "SELECT * FROM SYS.DATABASES" | dd of=testsqlconnection.sql
 for i in {1..60};
 do
-    /opt/mssql-tools/bin/sqlcmd -S mssql-fixture -U sa -P $SApassword -d master -i testsqlconnection.sql > /dev/null
+    /opt/mssql-tools/bin/sqlcmd -S $host,$port -U sa -P $SApassword -d master -C -i testsqlconnection.sql > /dev/null
     if [ $? -eq 0 ]
     then
         echo "SQL server ready"
@@ -45,7 +47,7 @@ then
         if [ $f == $sqlpath/*".sql" ]
         then
             echo "Executing $f"
-            /opt/mssql-tools/bin/sqlcmd -S mssql-fixture -U sa -P $SApassword -d master -i $f
+            /opt/mssql-tools/bin/sqlcmd -S $host,$port -U sa -P $SApassword -d master -C -i $f
         fi
     done
 fi
@@ -58,7 +60,7 @@ then
         then
             dbname=$(basename $f ".dacpac")
             echo "Deploying dacpac $f"
-            /opt/sqlpackage/sqlpackage /Action:Publish /SourceFile:$f /TargetServerName:mssql-fixture /TargetDatabaseName:$dbname /TargetUser:sa /TargetPassword:$SApassword
+            /opt/sqlpackage/sqlpackage /Action:Publish /SourceFile:$f /TargetServerName:$host,$port /TargetDatabaseName:$dbname /TargetUser:sa /TargetPassword:$SApassword
         fi
     done
 fi

@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -13,7 +15,7 @@ func TestAccLoginDataSource(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Read testing
 			{
-				Config: testAccLoginDataSourceConfig,
+				Config: testAccLoginDataSourceConfig(),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.mssqlpermissions_login.test", "id", "1"),
 				),
@@ -22,19 +24,21 @@ func TestAccLoginDataSource(t *testing.T) {
 	})
 }
 
-const testAccLoginDataSourceConfig = `
+func testAccLoginDataSourceConfig() string {
+	return fmt.Sprintf(`
 data "mssqlpermissions_login" "test" {
 	config = {
-		server_fqdn   = "mssql-fixture"
-		server_port   = 1433
+		server_fqdn   = %q
+		server_port   = %q
 		database_name = "ApplicationDB"
 	
 		sql_login = {
-		  username = "sa"
-		  password = "P@ssw0rd"
+			username = "sa"
+			password = "P@ssw0rd"
 		}
 	}
 
-    name = "sa"
+	name = "sa"
 }
-`
+`, os.Getenv("LOCAL_SQL_HOST"), os.Getenv("LOCAL_SQL_PORT"))
+}
