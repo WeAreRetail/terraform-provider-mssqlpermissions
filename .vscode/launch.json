@@ -6,9 +6,20 @@
             "type": "go",
             "request": "launch",
             "mode": "debug",
-            // this assumes your workspace is the root of the repo
             "program": "${workspaceFolder}",
             "cwd": "${workspaceFolder}/examples/provider-install-verification",
+            "env": {},
+            "args": [
+                "-debug",
+            ]
+        },
+        {
+            "name": "Debug Module",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/_troubleshoot/mod_azu_mssql_dba_permissions/examples",
             "env": {},
             "args": [
                 "-debug",

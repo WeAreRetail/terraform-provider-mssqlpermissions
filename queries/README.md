@@ -4,6 +4,14 @@
 
 Contain the high-level functions for managing logins, users and roles.
 
+## Useful SQL Queries
+
+### View permissions for connected user
+
+```sql
+SELECT * FROM fn_my_permissions(NULL, 'DATABASE');
+```
+
 ## Notes
 
 ### Contained Database

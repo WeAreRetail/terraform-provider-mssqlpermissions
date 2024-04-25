@@ -8,7 +8,7 @@ description: |-
 
 # mssqlpermissions Provider
 
-
+Manage SQL Server permissions. Locally or in Azure SQL Database.
 
 ## Example Usage
 
