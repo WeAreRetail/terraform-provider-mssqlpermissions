@@ -386,9 +386,11 @@ func (r *PermissionsResource) Read(ctx context.Context, req resource.ReadRequest
 // Finally, it updates the state of the PermissionsResource and returns any diagnostics encountered during the process.
 func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state model.PermissionResourceModel
+	var plan model.PermissionResourceModel
 	var err error
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
 	if resp.Diagnostics.HasError() {
 		return
@@ -426,6 +428,7 @@ func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateReq
 
 	// As the permissions are defined in a list, the order is not guaranteed.
 	// Therefore, we need to delete all permissions and then re-add them.
+	// We take all the permissions in the current state and remove them.
 	tflog.Debug(ctx, "PermissionsResource: delete all permissions")
 	for _, permissionState := range state.Permissions {
 		permission := &qmodel.Permission{
@@ -439,10 +442,12 @@ func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateReq
 		}
 	}
 
+	// Now that it is clean, add the permissions.
+	// We take all the permissions in the plan and add them.
 	var updatedPermissions []model.PermissionModel
-	for _, permissionState := range state.Permissions {
+	for _, permissionPlan := range plan.Permissions {
 		permission := &qmodel.Permission{
-			Name: permissionState.Name.ValueString(),
+			Name: permissionPlan.Name.ValueString(),
 		}
 
 		err = r.connector.GrantPermissionToRole(dbCtx, db, role, permission)

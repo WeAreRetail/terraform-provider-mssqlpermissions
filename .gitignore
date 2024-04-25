@@ -37,3 +37,5 @@ website/vendor
 # env files exclusion
 *.env
 terraform-provider-mssqlpermissions
+
+_troubleshoot/**/*
