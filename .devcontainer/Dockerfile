@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install additional packages
 RUN apt-get update \
-    && apt-get -y install --no-install-recommends procps lsb-release unzip gpg \
+    && apt-get -y install --no-install-recommends procps lsb-release unzip gpg shellcheck \
     && apt-get clean -y && rm -rf /var/lib/apt/lists/* /tmp/library-scripts
 
 # Install Customizations
@@ -27,6 +27,14 @@ RUN bash ./installSQLtools.sh \
 
 # Configure terraformrc
 COPY terraform/.terraformrc /root/.terraformrc
+
+# Export bash history
+RUN \
+    SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
+    && mkdir /commandhistory \
+    && touch /commandhistory/.bash_history \
+    && chown -R $REMOTE_USER /commandhistory \
+    && echo "$SNIPPET" >> "/home/$REMOTE_USER/.bashrc"
 
 # Install Go tools
 RUN \

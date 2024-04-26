@@ -26,7 +26,7 @@ func (c *Connector) GetDatabaseRole(ctx context.Context, db *sql.DB, databaseRol
 	}
 
 	// SQL query to get a database role.
-	query := `SELECT name, principal_id, type, type_desc, owning_principal_id, is_fixed_role 
+	query := `SELECT name, principal_id, type, type_desc, owning_principal_id, is_fixed_role
 				FROM [sys].[database_principals]
 				WHERE [name] = @name AND type_desc = 'DATABASE_ROLE'`
 
@@ -130,8 +130,8 @@ func (c *Connector) DeleteDatabaseRole(ctx context.Context, db *sql.DB, database
 		DECLARE @RoleMemberName sysname
 		DECLARE Member_Cursor CURSOR FOR
 		select [name]
-		from sys.database_principals 
-		where principal_id in ( 
+		from sys.database_principals
+		where principal_id in (
 			select member_principal_id
 			from sys.database_role_members
 			where role_principal_id in (
@@ -142,15 +142,15 @@ func (c *Connector) DeleteDatabaseRole(ctx context.Context, db *sql.DB, database
 
 		FETCH NEXT FROM Member_Cursor
 		into @RoleMemberName
-		
+
 		DECLARE @SQL NVARCHAR(4000)
 
 		WHILE @@FETCH_STATUS = 0
 		BEGIN
-			
+
 			SET @SQL = 'ALTER ROLE '+ QUOTENAME(@RoleName,'[') +' DROP MEMBER '+ QUOTENAME(@RoleMemberName,'[')
 			EXEC(@SQL)
-			
+
 			FETCH NEXT FROM Member_Cursor
 			into @RoleMemberName
 		END;
@@ -327,7 +327,7 @@ func (c *Connector) GetDatabaseRoleMembers(ctx context.Context, db *sql.DB, data
 	}
 
 	// SQL query to get the members of a database role.
-	query := `SELECT [name], [principal_id], [type], [type_desc], [default_schema_name], [sid], [authentication_type], [authentication_type_desc], [default_language_name] 
+	query := `SELECT [name], [principal_id], [type], [type_desc], [default_schema_name], [sid], [authentication_type], [authentication_type_desc], [default_language_name]
 				FROM [sys].[database_principals]
 				WHERE principal_id IN (
 					SELECT member_principal_id

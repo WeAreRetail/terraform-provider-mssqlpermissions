@@ -36,7 +36,7 @@ resource "azuread_directory_role_assignment" "spn_directory_reader" {
 
 resource "azuread_directory_role_assignment" "server_directory_reader" {
   role_id             = azuread_directory_role.directory_reader.template_id
-  principal_object_id = azurerm_mssql_server.sql_server.identity.0.principal_id
+  principal_object_id = azurerm_mssql_server.sql_server.identity[0].principal_id
 }
 
 resource "azuread_group" "admin_group" {

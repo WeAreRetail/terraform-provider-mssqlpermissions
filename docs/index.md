@@ -3,7 +3,7 @@
 page_title: "mssqlpermissions Provider"
 subcategory: ""
 description: |-
-  
+  Manage SQL Server permissions. Locally or in Azure SQL Database.
 ---
 
 # mssqlpermissions Provider

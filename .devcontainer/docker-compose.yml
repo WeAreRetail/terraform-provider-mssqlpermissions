@@ -8,6 +8,7 @@ services:
       dockerfile: Dockerfile
 
     volumes:
+      - projectname-bashhistory:/commandhistory
       - ..:/workspace/terraform-provider-mssqlpermissions
       - ~/.ssh:/home/vscode/.ssh-localhost:ro
 
@@ -43,3 +44,6 @@ networks:
   network:
     driver: bridge
     name: dev_network
+
+volumes:
+  projectname-bashhistory:

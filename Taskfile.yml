@@ -116,7 +116,7 @@ tasks:
       - terraform apply -auto-approve
       - task: merge-dotenv-files
     silent: true
-    
+
   # Reset Azure SQL Database and server by tainted them.
   terraform-reset-azure-db:
     desc: Reset Azure SQL Database and server by tainted them.

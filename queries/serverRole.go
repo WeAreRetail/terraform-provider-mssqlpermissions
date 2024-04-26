@@ -30,7 +30,7 @@ func (c *Connector) GetServerRole(ctx context.Context, db *sql.DB, serverRole *m
 	}
 
 	// SQL query to get a server role.
-	query := `SELECT name, principal_id, type, type_desc, owning_principal_id, is_fixed_role 
+	query := `SELECT name, principal_id, type, type_desc, owning_principal_id, is_fixed_role
 				FROM [master].[sys].[server_principals]
 				WHERE [name] = @name AND type_desc = 'SERVER_ROLE'`
 
@@ -150,30 +150,30 @@ func (c *Connector) DeleteServerRole(ctx context.Context, db *sql.DB, serverRole
 		DECLARE Member_Cursor CURSOR FOR
 		select [name]
 		from sys.server_principals
-		where principal_id in ( 
-			select member_principal_id 
-			from sys.server_role_members 
+		where principal_id in (
+			select member_principal_id
+			from sys.server_role_members
 			where role_principal_id in (
 				select principal_id
 				FROM sys.server_principals where [name] = @RoleName  AND type = 'R' ))
-	
+
 		OPEN Member_Cursor;
-	
+
 		FETCH NEXT FROM Member_Cursor
 		into @RoleMemberName
-	
+
 		DECLARE @SQL NVARCHAR(4000)
-			
+
 		WHILE @@FETCH_STATUS = 0
 		BEGIN
-			
+
 			SET @SQL = 'ALTER SERVER ROLE '+ QUOTENAME(@RoleName,'[') +' DROP MEMBER '+ QUOTENAME(@RoleMemberName,'[')
 			EXEC(@SQL)
-			
+
 			FETCH NEXT FROM Member_Cursor
 			into @RoleMemberName
 		END;
-	
+
 		CLOSE Member_Cursor;
 		DEALLOCATE Member_Cursor;
 	END;
