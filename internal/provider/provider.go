@@ -35,7 +35,9 @@ func (p *SqlPermissionsProvider) Metadata(ctx context.Context, req provider.Meta
 // It populates the response with the generated schema.
 func (p *SqlPermissionsProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Attributes: map[string]schema.Attribute{},
+		Description:         "Manage SQL Server permissions. Locally or in Azure SQL Database.",
+		MarkdownDescription: "Manage SQL Server permissions. Locally or in Azure SQL Database.",
+		Attributes:          map[string]schema.Attribute{},
 	}
 }
 

@@ -50,7 +50,7 @@ resource "mssqlpermissions_database_role" "test" {
 		server_fqdn   = %q
 		server_port   = %q
 		database_name = "ApplicationDB"
-	
+
 		sql_login = {
 		  username = "sa"
 		  password = "P@ssw0rd"

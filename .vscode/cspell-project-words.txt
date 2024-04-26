@@ -5,6 +5,7 @@ azurerm
 blocksort
 booldefault
 boolplanmodifier
+chdir
 cmds
 datasource
 davidanson
@@ -17,6 +18,7 @@ esbenp
 executesql
 fedauth
 github
+golangci
 GOPATH
 Italiano
 langid
@@ -29,6 +31,8 @@ qmodel
 QUOTENAME
 resultset
 setdefault
+shellcheck
+shfmt
 sqlcmd
 sqlserver
 SSMS

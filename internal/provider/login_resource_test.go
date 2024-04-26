@@ -44,7 +44,7 @@ resource "mssqlpermissions_login" "test" {
 		server_fqdn   = %q
 		server_port   = %q
 		database_name = "master"
-	
+
 		sql_login = {
 		  username = "sa"
 		  password = "P@ssw0rd"

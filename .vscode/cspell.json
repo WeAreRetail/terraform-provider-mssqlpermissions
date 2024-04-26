@@ -21,8 +21,7 @@
     ],
     "enableFiletypes": ["azure-pipelines", "terraform"],
     "import": [
-      "@cspell/dict-fr-fr/cspell-ext.json",
+      "@cspell/dict-fr-fr/cspell-ext.json"
     ],
     "language": "en,fr"
   }
-  
