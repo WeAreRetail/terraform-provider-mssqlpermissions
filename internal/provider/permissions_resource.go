@@ -218,7 +218,8 @@ func (r *PermissionsResource) Create(ctx context.Context, req resource.CreateReq
 
 	for _, permissionState := range state.Permissions {
 		permission := &qmodel.Permission{
-			Name: permissionState.Name.ValueString(),
+			Name:  permissionState.Name.ValueString(),
+			State: permissionState.State.ValueString(),
 		}
 
 		err = r.connector.AssignPermissionToRole(dbCtx, db, role, permission)
