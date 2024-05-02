@@ -258,6 +258,12 @@ func (r *DatabaseRoleMembersResource) Read(ctx context.Context, req resource.Rea
 		// Convert the members to a list of strings
 		state.Members = make([]types.String, 0) // Reset the members list in the state object
 		for _, member := range members {
+
+			// Ignore "dbo" as it is a special user that cannot be managed
+			if member.Name == "dbo" {
+				continue
+			}
+
 			state.Members = append(state.Members, types.StringValue(member.Name))
 		}
 
@@ -353,6 +359,11 @@ func (r *DatabaseRoleMembersResource) Update(ctx context.Context, req resource.U
 			}
 		}
 		if !found {
+			// Ignore "dbo" as it is a special user that cannot be managed
+			if memberInDB.Name == "dbo" {
+				continue
+			}
+
 			user := &qmodel.User{
 				Name: memberInDB.Name,
 			}
