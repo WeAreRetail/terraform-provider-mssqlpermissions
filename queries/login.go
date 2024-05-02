@@ -63,12 +63,7 @@ func (c *Connector) GetLogin(ctx context.Context, db *sql.DB, login *model.Login
 		return nil, fmt.Errorf("scan error - cannot retrieve login: %v", err)
 	}
 
-	// Return the retrieved login information.
-	if err != nil {
-		return nil, fmt.Errorf("cannot retrieve login. Underlying sql error : %v", err)
-	} else {
-		return login, nil
-	}
+	return login, nil
 }
 
 // CreateLogin creates a new login in the database.

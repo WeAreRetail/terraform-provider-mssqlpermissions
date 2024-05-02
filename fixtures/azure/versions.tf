@@ -41,3 +41,7 @@ provider "azurerm" {
   storage_use_azuread        = true
   skip_provider_registration = false
 }
+
+provider "azuread" {
+  tenant_id = var.tenant_id
+}

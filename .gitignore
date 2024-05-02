@@ -25,6 +25,8 @@ website/node_modules
 *.test
 *.iml
 
+__debug_*
+
 website/vendor
 
 # Test exclusions
@@ -34,8 +36,12 @@ website/vendor
 # Keep windows files with windows line endings
 *.winfile eol=crlf
 
-# env files exclusion
+# env and var files exclusion
 *.env
+*.tfvars
+
+# Misc
 terraform-provider-mssqlpermissions
 
+#Troubleshoot
 _troubleshoot/**/*

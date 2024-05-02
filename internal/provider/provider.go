@@ -61,11 +61,13 @@ func (p *SqlPermissionsProvider) Configure(ctx context.Context, req provider.Con
 // The order of the functions in the slice determines the order in which the resources are created.
 func (p *SqlPermissionsProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewLoginResource,
-		NewUserResource,
+		NewDatabaseRoleMembersResource,
 		NewDatabaseRoleResource,
-		NewServerRoleResource,
+		NewLoginResource,
 		NewPermissionsResource,
+		NewServerRoleMembersResource,
+		NewServerRoleResource,
+		NewUserResource,
 	}
 }
 
@@ -73,6 +75,7 @@ func (p *SqlPermissionsProvider) Resources(ctx context.Context) []func() resourc
 // Each function in the slice should return a datasource.DataSource.
 func (p *SqlPermissionsProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
+		NewDatabaseRoleDataSource,
 		NewLoginDataSource,
 		NewUserDataSource,
 	}

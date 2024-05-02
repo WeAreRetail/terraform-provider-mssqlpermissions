@@ -11,7 +11,8 @@
   "postCreateCommand": {
     "ssh": "mkdir -p /home/vscode/.ssh && cp -r /home/vscode/.ssh-localhost/* /home/vscode/.ssh && chmod 700 /home/vscode/.ssh && chmod 600 /home/vscode/.ssh/*",
     "db": "bash .devcontainer/mssql/postCreateCommand.sh 'P@ssw0rd' './bin/Debug/' './.devcontainer/mssql/'",
-    "cspell": "npm install -g cspell@latest"
+    "cspell": "npm install -g cspell@latest",
+    "pre-commit": "/usr/local/py-utils/bin/pre-commit install"
   },
   "remoteUser": "vscode",
   "features": {
@@ -28,6 +29,9 @@
       "tflint": "latest",
       "terragrunt": "none"
     }
+  },
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/usr/local/py-utils/bin"
   },
   "customizations": {
     "vscode": {
@@ -56,7 +60,7 @@
         "golang.go",
         "hashicorp.terraform",
         "ms-azuretools.vscode-docker",
-        "ms-mssql.mssql",
+        //"ms-mssql.mssql", // bug 20240430
         "ms-vscode.powershell",
         "redhat.vscode-yaml",
         "streetsidesoftware.code-spell-checker",

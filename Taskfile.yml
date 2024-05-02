@@ -5,6 +5,7 @@ version: '3'
 
 env:
   LOCAL_SQL_PASSWORD: P@ssw0rd
+  GODEBUG: netdns=cgo
 
 dotenv: ['.env', '.local.env', '.azure.env']
 

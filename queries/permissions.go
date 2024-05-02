@@ -15,11 +15,20 @@ import (
 // It means we need to query multiple views based on the object type to retrieve the full definition of the permission.
 // Schemas would be in sys.schemas, tables in sys.tables, columns in sys.columns, etc.
 
-// GrantPermissionToRole grants the specified permission to a role in the database.
+// AssignPermissionToRole assigns the specified permission, grant or deny, to a role in the database.
 // It takes a context, a database connection, a role, and a permission as parameters.
-// Returns nil if the permission is successfully granted to the role, otherwise returns an error.
-func (c *Connector) GrantPermissionToRole(ctx context.Context, db *sql.DB, role *model.Role, permission *model.Permission) error {
+// Returns nil if the permission is successfully denied to the role, otherwise returns an error.
+func (c *Connector) AssignPermissionToRole(ctx context.Context, db *sql.DB, role *model.Role, permission *model.Permission) error {
 	var err error
+	var stateVerb string = "GRANT"
+
+	if (permission.State != "G" && permission.State != "D" && permission.State != "") || (permission.StateDesc != "GRANT" && permission.StateDesc != "DENY" && permission.StateDesc != "") {
+		return fmt.Errorf("invalid state value, must be 'G', 'D', 'GRANT', or 'DENY'")
+	} else if permission.State == "G" || permission.StateDesc == "GRANT" {
+		stateVerb = "GRANT"
+	} else if permission.State == "D" || permission.StateDesc == "Deny" {
+		stateVerb = "DENY"
+	}
 
 	// Check if the database connection is nil.
 	if db == nil {
@@ -32,8 +41,8 @@ func (c *Connector) GrantPermissionToRole(ctx context.Context, db *sql.DB, role 
 		return fmt.Errorf("database ping failed: %v", err)
 	}
 
-	// SQL query to grant permissions to a role.
-	query := fmt.Sprintf("'GRANT %s TO ' + QUOTENAME(@roleName)", permission.Name)
+	// SQL query to deny permissions to a role.
+	query := fmt.Sprintf("'%s %s TO ' + QUOTENAME(@roleName)", stateVerb, permission.Name)
 	tsql := fmt.Sprintf("DECLARE @sql NVARCHAR(MAX)\nSET @sql = %s;\nEXEC (@sql)", query)
 
 	// Execute the query.
@@ -41,11 +50,43 @@ func (c *Connector) GrantPermissionToRole(ctx context.Context, db *sql.DB, role 
 
 	// Check for any error during the query execution.
 	if err != nil {
-		return fmt.Errorf("query execution error - cannot grant permissions to role: %v", err)
+		return fmt.Errorf("query execution error - cannot deny permissions to role: %v", err)
 	}
 
 	// Return nil error.
 	return nil
+}
+
+// DenyPermissionToRole denies the specified permission to a role in the database.
+// It takes a context, a database connection, a role, and a permission as parameters.
+// Returns nil if the permission is successfully denied to the role, otherwise returns an error.
+func (c *Connector) DenyPermissionToRole(ctx context.Context, db *sql.DB, role *model.Role, permission *model.Permission) error {
+	permission.State = "D"
+
+	return c.AssignPermissionToRole(ctx, db, role, permission)
+}
+
+// DenyPermissionsToRole denies the specified permissions to a role in the database.
+// It takes a context, a database connection, a role, and a slice of permissions as parameters.
+// Returns nil if the permissions are successfully denied to the role, otherwise returns an error.
+func (c *Connector) DenyPermissionsToRole(ctx context.Context, db *sql.DB, role *model.Role, permissions []*model.Permission) error {
+
+	for _, permission := range permissions {
+		err := c.DenyPermissionToRole(ctx, db, role, permission)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GrantPermissionToRole grants the specified permission to a role in the database.
+// It takes a context, a database connection, a role, and a permission as parameters.
+// Returns nil if the permission is successfully granted to the role, otherwise returns an error.
+func (c *Connector) GrantPermissionToRole(ctx context.Context, db *sql.DB, role *model.Role, permission *model.Permission) error {
+	permission.State = "G"
+
+	return c.AssignPermissionToRole(ctx, db, role, permission)
 }
 
 // GrantPermissionsToRole grants the specified permissions to a role in the database.
@@ -162,7 +203,7 @@ func (c *Connector) GetServerPermissionForRole(ctx context.Context, db *sql.DB, 
 		sql.Named("permissionName", permission.Name))
 
 	// Check for any error during the query execution.
-	if err != nil {
+	if row.Err() != nil {
 		return nil, fmt.Errorf("query execution error - cannot retrieve permission for role: %v", err)
 	}
 
@@ -283,7 +324,7 @@ func (c *Connector) GetDatabasePermissionForRole(ctx context.Context, db *sql.DB
 		sql.Named("permissionName", permission.Name))
 
 	// Check for any error during the query execution.
-	if err != nil {
+	if row.Err() != nil {
 		return nil, fmt.Errorf("query execution error - cannot retrieve permission for role: %v", err)
 	}
 

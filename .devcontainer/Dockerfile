@@ -48,6 +48,8 @@ RUN \
     && go install honnef.co/go/tools/cmd/staticcheck@latest \
     # --> GoReleaser
     && go install github.com/goreleaser/goreleaser@latest \
+    # --> shfmt
+    && go install mvdan.cc/sh/v3/cmd/shfmt@latest \
     #
     # Clean up
     && rm -rf /go/src/ && rm -rf /go/pkg

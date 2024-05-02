@@ -33,5 +33,11 @@
   "terraform.codelens.referenceCount": true,
   "terraform.experimentalFeatures.prefillRequiredFields": true,
   "gopls": { "ui.semanticTokens": true },
-  "go.testEnvFile": "${workspaceFolder}/.vscode-test.env"
+  "go.testEnvFile": "${workspaceFolder}/.vscode-test.env",
+  "go.testEnvVars": {
+    "GODEBUG": "netdns=cgo"
+  },
+  "terminal.integrated.env.linux": {
+    "GODEBUG": "netdns=cgo"
+  }
 }
