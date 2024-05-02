@@ -213,6 +213,11 @@ func (c *Connector) GetUser(ctx context.Context, db *sql.DB, user *model.User) (
 		&result.AuthenticationTypeDesc,
 		&result.DefaultLanguageName)
 
+	// Check if the user was not found.
+	if err == sql.ErrNoRows {
+		return nil, errors.New("user not found")
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve user: %v", err)
 	}
