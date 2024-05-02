@@ -84,6 +84,84 @@ func TestConnector_GrantPermissionToRole(t *testing.T) {
 			}
 		}
 	}
+}// TestConnector_GrantPermissionToRole is a unit test function that tests the GrantPermissionToRole method of the Connector struct.
+// It verifies the behavior of granting permissions to a role on a database or server.
+func TestConnector_DenyPermissionToRole(t *testing.T) {
+	tests := []struct {
+		name             string
+		connector        *Connector
+		databaseOverride string
+		role             *model.Role
+		permission       *model.Permission
+		wantErr          bool
+	}{
+		{
+			name:             "deny-server-permission-to-role-on-LocalSQL",
+			connector:        testConnectors.localSQL,
+			databaseOverride: "master",
+			role: &model.Role{
+				Name: generateRandomString(10),
+			},
+			permission: &model.Permission{
+				Name: "VIEW SERVER STATE",
+			},
+			wantErr: false,
+		},
+		{
+			name:             "deny-server-permission-to-role-on-azureSQL",
+			connector:        testConnectors.azureSQL,
+			databaseOverride: "master",
+			role: &model.Role{
+				Name: generateRandomString(10),
+			},
+			permission: &model.Permission{
+				Name: "VIEW SERVER STATE",
+			},
+			wantErr: true, // This test case will fail because we cannot create server roles on Azure SQL.
+		},
+	}
+
+	for _, tt := range tests {
+
+		dbRestore := tt.connector.Database
+
+		// Override database if specified.
+		if tt.databaseOverride != "" {
+			tt.connector.Database = tt.databaseOverride
+		}
+
+		ctx := context.Background()
+		db, _ := tt.connector.Connect()
+
+		// Create the server role to delete
+		err := tt.connector.CreateServerRole(ctx, db, tt.role)
+
+		if (err != nil) != tt.wantErr {
+			t.Errorf("Test case %s: error during setup = %v", tt.name, err)
+			return
+		}
+
+		// Call the function to test.
+		err = tt.connector.DenyPermissionToRole(ctx, db, tt.role, tt.permission)
+
+		// Cleanup the server role created for the test.
+		errCleanup := tt.connector.DeleteServerRole(ctx, db, tt.role)
+
+		// Restore the original database value.
+		tt.connector.Database = dbRestore
+
+		// Check if the error condition matches the expectation.
+		if (err != nil) != tt.wantErr {
+			t.Errorf("Test case %s: Connector.DenyPermissionToRole() error = %v, wantErr %v", tt.name, err, tt.wantErr)
+			return
+		} else if err == nil {
+			// Check if the cleanup was successful.
+			if errCleanup != nil {
+				t.Errorf("Test case %s: error during cleanup = %v", tt.name, err)
+				return
+			}
+		}
+	}
 }
 
 // TestConnector_GetServerPermissionsForRole is a unit test function that tests the GetServerPermissionsForRole method of the Connector struct.

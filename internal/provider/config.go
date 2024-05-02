@@ -4,10 +4,13 @@
 package provider
 
 import (
+	"context"
 	"queries"
 	"terraform-provider-mssqlpermissions/internal/provider/model"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 )
 
 // getConfigSchema returns the schema for the database connection configuration.
@@ -106,7 +109,12 @@ func getConfigSchema() schema.SingleNestedAttribute {
 }
 
 // getConnector returns the connector for the database connection configuration.
-func getConnector(config *model.ConfigModel) *queries.Connector {
+func getConnector(config *model.ConfigModel) (*queries.Connector, diag.Diagnostics) {
+
+	ctx := context.Background()
+	var sqlLogin model.SQLLoginModel
+	var spnLogin model.SPNLoginModel
+	var msiLogin model.MSILoginModel
 
 	connector := &queries.Connector{
 		Host:     config.ServerFqdn.ValueString(),
@@ -114,28 +122,48 @@ func getConnector(config *model.ConfigModel) *queries.Connector {
 		Database: config.DatabaseName.ValueString(),
 	}
 
-	if config.SQLLogin != nil {
+	if !config.SQLLogin.IsNull() && !config.SQLLogin.IsUnknown() {
+		diags := config.SQLLogin.As(ctx, &sqlLogin, basetypes.ObjectAsOptions{})
+
+		if diags.HasError() {
+			return nil, diags
+		}
+
 		connector.LocalUserLogin = &queries.LocalUserLogin{
-			Username: config.SQLLogin.Username.ValueString(),
-			Password: config.SQLLogin.Password.ValueString(),
+			Username: sqlLogin.Username.ValueString(),
+			Password: sqlLogin.Password.ValueString(),
 		}
 	}
 
-	if config.SPNLogin != nil {
+	if !config.SPNLogin.IsNull() && !config.SPNLogin.IsUnknown() {
+
+		diags := config.SPNLogin.As(ctx, &spnLogin, basetypes.ObjectAsOptions{})
+
+		if diags.HasError() {
+			return nil, diags
+		}
+
 		connector.AzureApplicationLogin = &queries.AzureApplicationLogin{
-			ClientId:     config.SPNLogin.ClientID.ValueString(),
-			ClientSecret: config.SPNLogin.ClientSecret.ValueString(),
-			TenantId:     config.SPNLogin.TenantID.ValueString(),
+			ClientId:     spnLogin.ClientID.ValueString(),
+			ClientSecret: spnLogin.ClientSecret.ValueString(),
+			TenantId:     spnLogin.TenantID.ValueString(),
 		}
 	}
 
-	if config.MSILogin != nil {
+	if !config.MSILogin.IsNull() && !config.MSILogin.IsUnknown() {
+
+		diags := config.MSILogin.As(ctx, &msiLogin, basetypes.ObjectAsOptions{})
+
+		if diags.HasError() {
+			return nil, diags
+		}
+
 		connector.ManagedIdentityLogin = &queries.ManagedIdentityLogin{
-			UserIdentity: config.MSILogin.UserIdentity.ValueBool(),
-			UserId:       config.MSILogin.UserId.ValueString(),
-			ResourceId:   config.MSILogin.ResourceId.ValueString(),
+			UserIdentity: msiLogin.UserIdentity.ValueBool(),
+			UserId:       msiLogin.UserId.ValueString(),
+			ResourceId:   msiLogin.ResourceId.ValueString(),
 		}
 	}
 
-	return connector
+	return connector, nil
 }

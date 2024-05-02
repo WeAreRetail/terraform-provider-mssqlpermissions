@@ -111,6 +111,7 @@ func loadVars() error {
 		localTestConf.server = os.Getenv("LOCAL_MSSQL_SERVER")
 		localTestConf.username = os.Getenv("LOCAL_MSSQL_USERNAME")
 		localTestConf.database = os.Getenv("LOCAL_MSSQL_DATABASE")
+
 	}
 
 	if runAzureTests {
@@ -124,6 +125,7 @@ func loadVars() error {
 		azureTestConf.userClientId = os.Getenv("AZURE_MSSQL_USER_CLIENT_ID")
 		azureTestConf.userClientSecret = os.Getenv("AZURE_MSSQL_USER_CLIENT_DISPLAY_NAME")
 	}
+	fmt.Printf("Local test configuration loaded")
 
 	return nil
 }

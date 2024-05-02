@@ -49,12 +49,7 @@ func (c *Connector) GetDatabaseRole(ctx context.Context, db *sql.DB, databaseRol
 		return nil, fmt.Errorf("scan error - cannot retrieve database role: %v", err)
 	}
 
-	// Return the retrieved database role information.
-	if err != nil {
-		return nil, fmt.Errorf("cannot retrieve database role. Underlying sql error : %v", err)
-	} else {
-		return databaseRole, nil
-	}
+	return databaseRole, nil
 }
 
 // CreateDatabaseRole creates a new database role in the specified database.

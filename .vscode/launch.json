@@ -7,8 +7,10 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}",
-            "cwd": "${workspaceFolder}/examples/provider-install-verification",
-            "env": {},
+            "cwd": "${workspaceFolder}/examples/data-sources/mssqlpermissions_database_role",
+            "env": {
+                "GODEBUG": "netdns=cgo"
+            },
             "args": [
                 "-debug",
             ]
@@ -20,7 +22,9 @@
             "mode": "debug",
             "program": "${workspaceFolder}",
             "cwd": "${workspaceFolder}/_troubleshoot/mod_azu_mssql_dba_permissions/examples",
-            "env": {},
+            "env": {
+                "GODEBUG": "netdns=cgo"
+            },
             "args": [
                 "-debug",
             ]

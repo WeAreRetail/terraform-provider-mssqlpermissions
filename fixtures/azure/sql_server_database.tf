@@ -58,7 +58,7 @@ resource "azurerm_mssql_database" "db" {
   sku_name  = "Basic"
 
   provisioner "local-exec" {
-    command = "/usr/bin/sqlcmd -S '${azurerm_mssql_server.sql_server.fully_qualified_domain_name}' --authentication-method ActiveDirectoryServicePrincipal -U '${azuread_service_principal.sql_admin.client_id}' -P '${azuread_service_principal_password.sql_admin.value}' -d ${self.name} -i ${path.root}/database_schema.sql"
+    command = "/usr/bin/sqlcmd -S '${azurerm_mssql_server.sql_server.fully_qualified_domain_name}' --authentication-method ActiveDirectoryServicePrincipal -U '${azuread_service_principal.sql_admin.client_id}' -P '${azuread_application_password.sql_admin.value}' -d ${self.name} -i ${path.root}/database_schema.sql"
   }
 }
 
@@ -76,20 +76,20 @@ resource "local_sensitive_file" "local_env" {
                         export AZURE_TENANT_ID='${var.tenant_id}'
                         export AZURE_MSSQL_DATABASE='${azurerm_mssql_database.db.name}'
                         export AZURE_MSSQL_ADMIN_CLIENT_ID='${azuread_service_principal.sql_admin.client_id}'
-                        export AZURE_MSSQL_ADMIN_CLIENT_SECRET='${azuread_service_principal_password.sql_admin.value}'
+                        export AZURE_MSSQL_ADMIN_CLIENT_SECRET='${azuread_application_password.sql_admin.value}'
                         export AZURE_MSSQL_PASSWORD='${azurerm_mssql_server.sql_server.administrator_login_password}'
                         export AZURE_MSSQL_SERVER='${azurerm_mssql_server.sql_server.fully_qualified_domain_name}'
                         export AZURE_MSSQL_USERNAME='${azurerm_mssql_server.sql_server.administrator_login}'
                         export AZURE_MSSQL_USER_CLIENT_ID='${azuread_service_principal.sql_user.client_id}'
-                        export AZURE_MSSQL_USER_CLIENT_SECRET='${azuread_service_principal_password.sql_user.value}'
+                        export AZURE_MSSQL_USER_CLIENT_SECRET='${azuread_application_password.sql_user.value}'
                         export AZURE_MSSQL_USER_CLIENT_DISPLAY_NAME='${azuread_service_principal.sql_user.display_name}'
                         # Configuration for fedauth which uses env vars via DefaultAzureCredential
                         export AZURE_TENANT_ID='${var.tenant_id}'
                         export AZURE_CLIENT_ID='${azuread_service_principal.sql_admin.client_id}'
-                        export AZURE_CLIENT_SECRET='${azuread_service_principal_password.sql_admin.value}'
+                        export AZURE_CLIENT_SECRET='${azuread_application_password.sql_admin.value}'
                         # Configuration for provider
                         export ARM_CLIENT_ID='${azuread_service_principal.sql_admin.client_id}'
-                        export ARM_CLIENT_SECRET='${azuread_service_principal_password.sql_admin.value}'
+                        export ARM_CLIENT_SECRET='${azuread_application_password.sql_admin.value}'
                         export ARM_TENANT_ID='${var.tenant_id}'
                         export MSSQL_SERVER='${azurerm_mssql_server.sql_server.fully_qualified_domain_name}'
                         export MSSQL_DATABASE='${azurerm_mssql_database.db.name}'

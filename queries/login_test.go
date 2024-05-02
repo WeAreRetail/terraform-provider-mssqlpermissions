@@ -90,7 +90,18 @@ func TestConnector_GetLogin(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			db, _ := tt.connector.Connect()
+			db, err := tt.connector.Connect()
+
+			// Check if the connection was successful.
+			if err != nil {
+				t.Errorf("Test case %s: Connector.Connect() error = %v", tt.name, err)
+
+				// Restore the original database value.
+				tt.connector.Database = dbRestore
+
+				return
+			}
+
 			gotLogin, err := tt.connector.GetLogin(ctx, db, tt.login)
 
 			// Restore the original database value.

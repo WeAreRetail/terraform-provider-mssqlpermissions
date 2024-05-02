@@ -6,6 +6,7 @@ import (
 	qmodel "queries/model"
 	"terraform-provider-mssqlpermissions/internal/provider/model"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -125,6 +126,7 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 
 	var state model.UserResourceModel
 	var err error
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
 
@@ -133,7 +135,12 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 	}
 
 	tflog.Debug(ctx, "UserResource: getConnector")
-	r.connector = getConnector(state.Config)
+	r.connector, diags = getConnector(state.Config)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	// Set up the context and connect to the database.
 	dbCtx := context.Background()
@@ -193,7 +200,7 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 		state.ObjectID = types.StringValue(user.ObjectID)
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -207,6 +214,7 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state model.UserResourceModel
 	var err error
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
@@ -215,7 +223,12 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	}
 
 	tflog.Debug(ctx, "UserResource: getConnector")
-	r.connector = getConnector(state.Config)
+	r.connector, diags = getConnector(state.Config)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	// Set up the context and connect to the database.
 	dbCtx := context.Background()
@@ -247,6 +260,7 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state model.UserResourceModel
 	var err error
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
@@ -255,7 +269,12 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	}
 
 	tflog.Debug(ctx, "UserResource: getConnector")
-	r.connector = getConnector(state.Config)
+	r.connector, diags = getConnector(state.Config)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	// Set up the context and connect to the database.
 	dbCtx := context.Background()
@@ -310,7 +329,7 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		state.ObjectID = types.StringValue(user.ObjectID)
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -325,6 +344,7 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	var state model.UserResourceModel
 	var err error
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
 
@@ -333,7 +353,12 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 
 	tflog.Debug(ctx, "UserResource: getConnector")
-	r.connector = getConnector(state.Config)
+	r.connector, diags = getConnector(state.Config)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	// Set up the context and connect to the database.
 	dbCtx := context.Background()
@@ -392,7 +417,7 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		state.ObjectID = types.StringValue(user.ObjectID)
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

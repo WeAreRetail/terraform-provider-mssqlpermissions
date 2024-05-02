@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -108,6 +109,7 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 	var state model.UserDataModel
 	var err error
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &state)...)
 
@@ -116,7 +118,12 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 
 	tflog.Debug(ctx, "userDataSource: getConnector")
-	d.connector = getConnector(state.Config)
+	d.connector, diags = getConnector(state.Config)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	// Set up the context and connect to the database.
 	dbCtx := context.Background()
@@ -162,7 +169,7 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		state.ObjectID = types.StringValue(user.ObjectID)
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

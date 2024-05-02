@@ -6,6 +6,7 @@ import (
 	qmodel "queries/model"
 	"terraform-provider-mssqlpermissions/internal/provider/model"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
@@ -106,6 +107,7 @@ func (r *LoginResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	var state model.LoginResourceModel
 	var err error
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
 
@@ -114,7 +116,12 @@ func (r *LoginResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	tflog.Debug(ctx, "LoginResource: getConnector")
-	r.connector = getConnector(state.Config)
+	r.connector, diags = getConnector(state.Config)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	// Set up the context and connect to the database.
 	dbCtx := context.Background()
@@ -159,7 +166,7 @@ func (r *LoginResource) Create(ctx context.Context, req resource.CreateRequest, 
 	state.DefaultDatabase = types.StringValue(login.DefaultDatabase)
 	state.DefaultLanguage = types.StringValue(login.DefaultLanguage)
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -172,6 +179,7 @@ func (r *LoginResource) Create(ctx context.Context, req resource.CreateRequest, 
 func (r *LoginResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state model.LoginResourceModel
 	var err error
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
@@ -180,7 +188,12 @@ func (r *LoginResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	}
 
 	tflog.Debug(ctx, "LoginResource: getConnector")
-	r.connector = getConnector(state.Config)
+	r.connector, diags = getConnector(state.Config)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	// Set up the context and connect to the database.
 	dbCtx := context.Background()
@@ -212,6 +225,7 @@ func (r *LoginResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 func (r *LoginResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state model.LoginResourceModel
 	var err error
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
@@ -220,7 +234,12 @@ func (r *LoginResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	}
 
 	tflog.Debug(ctx, "LoginResource: getConnector")
-	r.connector = getConnector(state.Config)
+	r.connector, diags = getConnector(state.Config)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	// Set up the context and connect to the database.
 	dbCtx := context.Background()
@@ -260,7 +279,7 @@ func (r *LoginResource) Read(ctx context.Context, req resource.ReadRequest, resp
 		state.DefaultLanguage = types.StringValue(login.DefaultLanguage)
 	}
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -274,6 +293,7 @@ func (r *LoginResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 	var state model.LoginResourceModel
 	var err error
+	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
 
@@ -282,7 +302,12 @@ func (r *LoginResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	tflog.Debug(ctx, "LoginResource: getConnector")
-	r.connector = getConnector(state.Config)
+	r.connector, diags = getConnector(state.Config)
+
+	if diags.HasError() {
+		resp.Diagnostics.Append(diags...)
+		return
+	}
 
 	// Set up the context and connect to the database.
 	dbCtx := context.Background()
@@ -326,7 +351,7 @@ func (r *LoginResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	state.DefaultDatabase = types.StringValue(login.DefaultDatabase)
 	state.DefaultLanguage = types.StringValue(login.DefaultLanguage)
 
-	diags := resp.State.Set(ctx, &state)
+	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return

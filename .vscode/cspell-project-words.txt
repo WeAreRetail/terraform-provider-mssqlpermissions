@@ -2,6 +2,7 @@ azuread
 azurecaf
 azuredevops
 azurerm
+basetypes
 blocksort
 booldefault
 boolplanmodifier
@@ -18,13 +19,16 @@ esbenp
 executesql
 fedauth
 github
+GODEBUG
 golangci
 GOPATH
+ISNULL
 Italiano
 langid
 lsql
 mssqldb
 mssqlpermissions
+netdns
 NVARCHAR
 planmodifier
 qmodel
@@ -36,6 +40,7 @@ shfmt
 sqlcmd
 sqlserver
 SSMS
+stringdefault
 stringplanmodifier
 stringvalidator
 syslanguages

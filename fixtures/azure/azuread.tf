@@ -25,8 +25,8 @@ resource "azuread_service_principal" "sql_admin" {
   client_id = azuread_application.sql_admin.client_id
 }
 
-resource "azuread_service_principal_password" "sql_admin" {
-  service_principal_id = azuread_service_principal.sql_admin.id
+resource "azuread_application_password" "sql_admin" {
+  application_id = azuread_application.sql_admin.id
 }
 
 resource "azuread_directory_role_assignment" "spn_directory_reader" {
@@ -59,6 +59,6 @@ resource "azuread_service_principal" "sql_user" {
   client_id = azuread_application.sql_user.client_id
 }
 
-resource "azuread_service_principal_password" "sql_user" {
-  service_principal_id = azuread_service_principal.sql_user.id
+resource "azuread_application_password" "sql_user" {
+  application_id = azuread_application.sql_user.id
 }
