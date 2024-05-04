@@ -15,7 +15,7 @@ import (
 	azuread "github.com/microsoft/go-mssqldb/azuread"
 )
 
-// The database connection
+// The database connection.
 var db *sql.DB
 
 type FedAuth string
@@ -24,7 +24,7 @@ func (f FedAuth) String() string {
 	return string(f)
 }
 
-// Constants
+// Constants.
 const (
 	defaultTimeout = 30 * time.Second
 

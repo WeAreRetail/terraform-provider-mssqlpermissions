@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	model "queries/model"
+	"terraform-provider-mssqlpermissions/internal/queries/model"
 )
 
 // Notes:

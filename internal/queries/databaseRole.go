@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	model "queries/model"
+	"terraform-provider-mssqlpermissions/internal/queries/model"
 )
 
 // GetDatabaseRole retrieves a database role from the specified database.
@@ -322,7 +322,7 @@ func (c *Connector) GetDatabaseRoleMembers(ctx context.Context, db *sql.DB, data
 	}
 
 	// SQL query to get the members of a database role.
-	query := `SELECT [name], [principal_id], [type], [type_desc], [default_schema_name], [sid], [authentication_type], [authentication_type_desc], [default_language_name]
+	query := `SELECT [name], [principal_id], [type], [type_desc], [default_schema_name], CONVERT(varchar(max), [sid], 1) as [sid], [authentication_type], [authentication_type_desc], [default_language_name]
 				FROM [sys].[database_principals]
 				WHERE principal_id IN (
 					SELECT member_principal_id

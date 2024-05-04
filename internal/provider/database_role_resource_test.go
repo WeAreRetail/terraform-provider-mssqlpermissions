@@ -102,7 +102,7 @@ func testAccDatabaseRoleResourceConfigAzureSQL(name string, member string) strin
 	return fmt.Sprintf(`
 resource "mssqlpermissions_database_role" "test" {
 	config = {
-		server_fqdn   = "d10tfp76c9sqlvrle.database.windows.net"
+		server_fqdn   = "d10abc76c9sqlfind.database.windows.net"
 		server_port   = 1433
 		database_name = "ApplicationDB"
 	  }

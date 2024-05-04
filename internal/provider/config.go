@@ -5,8 +5,8 @@ package provider
 
 import (
 	"context"
-	"queries"
 	"terraform-provider-mssqlpermissions/internal/provider/model"
+	"terraform-provider-mssqlpermissions/internal/queries"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"

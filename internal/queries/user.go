@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	model "queries/model"
 	"strings"
+	"terraform-provider-mssqlpermissions/internal/queries/model"
 )
 
 // validateUser validates the given user object.
@@ -191,7 +191,7 @@ func (c *Connector) GetUser(ctx context.Context, db *sql.DB, user *model.User) (
 	}
 
 	// SQL query to retrieve a user
-	query := "SELECT [name], [principal_id], [type], [type_desc], [default_schema_name], [sid], [authentication_type], [authentication_type_desc], [default_language_name] FROM sys.database_principals"
+	query := "SELECT [name], [principal_id], [type], [type_desc], [default_schema_name], CONVERT(varchar(max), [sid], 1) as [sid], [authentication_type], [authentication_type_desc], [default_language_name] FROM sys.database_principals"
 
 	if user.Name != "" {
 		query = query + " WHERE [name] = @name"
