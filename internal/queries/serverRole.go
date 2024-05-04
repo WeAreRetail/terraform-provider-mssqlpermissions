@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	model "queries/model"
+	"terraform-provider-mssqlpermissions/internal/queries/model"
 )
 
 // GetServerRole retrieves the server role information from the master database.
@@ -50,15 +50,10 @@ func (c *Connector) GetServerRole(ctx context.Context, db *sql.DB, serverRole *m
 		return nil, errors.New("server role not found")
 	} else if err != nil {
 		// Check for other scan errors.
-		return nil, fmt.Errorf("scan error - cannot retrieve server role: %v", err)
+		return nil, fmt.Errorf("scan error - cannot retrieve server role. Underlying sql error : %v", err)
 	}
 
-	// Return the retrieved server role information.
-	if err != nil {
-		return nil, fmt.Errorf("cannot retrieve server role. Underlying sql error : %v", err)
-	} else {
-		return serverRole, nil
-	}
+	return serverRole, nil
 }
 
 // CreateServerRole creates a server role in the specified database. Not available on Azure Database.

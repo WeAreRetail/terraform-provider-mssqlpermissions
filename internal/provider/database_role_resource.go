@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
-	"queries"
-	qmodel "queries/model"
 	"terraform-provider-mssqlpermissions/internal/provider/model"
+	"terraform-provider-mssqlpermissions/internal/queries"
+	qmodel "terraform-provider-mssqlpermissions/internal/queries/model"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 

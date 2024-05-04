@@ -3,8 +3,8 @@ package queries
 import (
 	"context"
 	"fmt"
-	model "queries/model"
 	"reflect"
+	"terraform-provider-mssqlpermissions/internal/queries/model"
 	"testing"
 )
 

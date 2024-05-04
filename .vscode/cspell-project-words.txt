@@ -57,5 +57,6 @@ tfrdb
 tfsdk
 tfup
 tsql
+varchar
 Vitr
 yzhang

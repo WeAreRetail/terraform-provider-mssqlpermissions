@@ -2,7 +2,7 @@ package queries
 
 import (
 	"context"
-	model "queries/model"
+	"terraform-provider-mssqlpermissions/internal/queries/model"
 	"testing"
 )
 
@@ -84,7 +84,7 @@ func TestConnector_GrantPermissionToRole(t *testing.T) {
 			}
 		}
 	}
-}// TestConnector_GrantPermissionToRole is a unit test function that tests the GrantPermissionToRole method of the Connector struct.
+} // TestConnector_GrantPermissionToRole is a unit test function that tests the GrantPermissionToRole method of the Connector struct.
 // It verifies the behavior of granting permissions to a role on a database or server.
 func TestConnector_DenyPermissionToRole(t *testing.T) {
 	tests := []struct {

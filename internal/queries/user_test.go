@@ -3,7 +3,7 @@ package queries
 import (
 	"context"
 	"fmt"
-	model "queries/model"
+	"terraform-provider-mssqlpermissions/internal/queries/model"
 	"testing"
 )
 
@@ -101,7 +101,11 @@ func TestConnector_CreateUser(t *testing.T) {
 					Name:     tt.user.LoginName,
 					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 				}
-				tt.connector.CreateLogin(ctx, db, login)
+				err := tt.connector.CreateLogin(ctx, db, login)
+				if err != nil {
+					t.Errorf("Test case %s: Unable to create the login to get: %v", tt.name, err)
+					return
+				}
 			}
 
 			// Invoke the CreateUser method with the provided login model.
@@ -219,7 +223,7 @@ func TestConnector_GetUser(t *testing.T) {
 	for _, tt := range tests {
 		// Run each test case in a sub-test to isolate and identify failures.
 		t.Run(tt.name, func(t *testing.T) {
-			var err error = nil
+			var err error
 			// Capture the original state of the connector's database for restoration.
 			dbRestore := tt.connector.Database
 
@@ -381,7 +385,12 @@ func TestConnector_UpdateUser(t *testing.T) {
 					Name:     tt.user.LoginName,
 					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 				}
-				tt.connector.CreateLogin(ctx, db, login)
+
+				err := tt.connector.CreateLogin(ctx, db, login)
+				if err != nil {
+					t.Errorf("Test case %s: Unable to create the login to get: %v", tt.name, err)
+					return
+				}
 			}
 
 			// Create an updated login for the test if needed
@@ -391,7 +400,12 @@ func TestConnector_UpdateUser(t *testing.T) {
 					Name:     tt.updatedUser.LoginName,
 					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 				}
-				tt.connector.CreateLogin(ctx, db, updatedLogin)
+
+				err := tt.connector.CreateLogin(ctx, db, login)
+				if err != nil {
+					t.Errorf("Test case %s: Unable to create the login to get: %v", tt.name, err)
+					return
+				}
 			}
 
 			tt.updatedUser.Name = tt.user.Name
@@ -520,7 +534,12 @@ func TestConnector_DeleteUser(t *testing.T) {
 					Name:     tt.user.LoginName,
 					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 				}
-				tt.connector.CreateLogin(ctx, db, login)
+
+				err := tt.connector.CreateLogin(ctx, db, login)
+				if err != nil {
+					t.Errorf("Test case %s: Unable to create the login to get: %v", tt.name, err)
+					return
+				}
 			}
 
 			// Invoke the CreateUser method with the provided login model.

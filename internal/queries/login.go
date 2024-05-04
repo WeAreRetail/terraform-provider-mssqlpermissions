@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	model "queries/model"
+	"terraform-provider-mssqlpermissions/internal/queries/model"
 )
 
 // GetLogin retrieves login information based on the provided login name or principal ID.
