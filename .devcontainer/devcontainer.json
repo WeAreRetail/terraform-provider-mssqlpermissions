@@ -36,6 +36,7 @@
   "customizations": {
     "vscode": {
       "settings": {
+        "extensions.verifySignature": false, // Generate issue and timeout when building
         "files.eol": "\n",
         "terminal.integrated.shell.linux": "/bin/bash",
         "mssql.connections": [
@@ -53,16 +54,19 @@
         ]
       },
       "extensions": [
-        "1nVitr0.blocksort",
-        "davidanson.vscode-markdownlint",
+        "ms-vscode-remote.remote-containers",
+        "ms-vscode.azure-account",
+        "ms-vscode.powershell",
+        "ms-azuretools.vscode-docker",
+        "ms-azure-devops.azure-pipelines",
+        "ms-mssql.mssql",
         "eamodio.gitlens",
-        "esbenp.prettier-vscode",
         "golang.go",
         "hashicorp.terraform",
-        "ms-azuretools.vscode-docker",
-        //"ms-mssql.mssql", // bug 20240430
-        "ms-vscode.powershell",
+        "1nVitr0.blocksort",
         "redhat.vscode-yaml",
+        "davidanson.vscode-markdownlint",
+        "esbenp.prettier-vscode",
         "streetsidesoftware.code-spell-checker",
         "task.vscode-task",
         "yzhang.markdown-all-in-one"

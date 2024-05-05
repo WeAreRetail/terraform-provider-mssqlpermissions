@@ -7,6 +7,9 @@ services:
       context: .
       dockerfile: Dockerfile
 
+    environment:
+      - GODEBUG=netdns=cgo
+
     volumes:
       - projectname-bashhistory:/commandhistory
       - ..:/workspace/terraform-provider-mssqlpermissions
