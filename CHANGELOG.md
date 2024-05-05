@@ -1,5 +1,11 @@
 <!-- markdownlint-disable-file MD024 MD041 -->
 
+## 0.1.5
+
+BUG FIXES:
+
+* Keep state order for roles' members.
+
 ## 0.1.4
 
 BUG FIXES:
