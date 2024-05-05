@@ -255,19 +255,36 @@ func (r *DatabaseRoleMembersResource) Read(ctx context.Context, req resource.Rea
 			return
 		}
 
-		// Convert the members to a list of strings
-		state.Members = make([]types.String, 0) // Reset the members list in the state object
-		for _, member := range members {
+		// ⚠️ We need to keep the same order as the state, else terraform will detect a change.
 
-			// Ignore "dbo" as it is a special user that cannot be managed
-			if member.Name == "dbo" {
-				continue
+		// List the users in the State and create a list with the users in the database in the same order.
+		// After this step, we have ordered the user in the database the same way as the user in the state. But additional users from the database still need to be added.
+		futureStateMembers := make([]types.String, 0)
+		for _, stateMember := range state.Members {
+			for _, currentMember := range members {
+				if types.StringValue(currentMember.Name) == stateMember {
+					futureStateMembers = append(futureStateMembers, types.StringValue(currentMember.Name))
+					break
+				}
 			}
+		}
 
-			state.Members = append(state.Members, types.StringValue(member.Name))
+		// Add in futureStateMembers all the users in the "members" list but not yet in the futureStateMembers list.
+		for _, currentMember := range members {
+			found := false
+			for _, stateMember := range state.Members {
+				if types.StringValue(currentMember.Name) == stateMember {
+					found = true
+					break
+				}
+			}
+			if !found && currentMember.Name != "dbo" { // Ignore "dbo" as it is a special user that cannot be managed
+				futureStateMembers = append(futureStateMembers, types.StringValue(currentMember.Name))
+			}
 		}
 
 		state.Name = types.StringValue(role.Name)
+		state.Members = futureStateMembers
 	}
 
 	diags = resp.State.Set(ctx, &state)
