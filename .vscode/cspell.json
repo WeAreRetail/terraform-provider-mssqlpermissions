@@ -20,8 +20,6 @@
       "obj"
     ],
     "enableFiletypes": ["azure-pipelines", "terraform"],
-    "import": [
-      "@cspell/dict-fr-fr/cspell-ext.json"
-    ],
+    "import": [],
     "language": "en,fr"
   }

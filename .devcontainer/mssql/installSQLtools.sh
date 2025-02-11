@@ -9,7 +9,7 @@ echo "Installing mssql-tools - ODBC"
 echo "deb [arch=amd64,arm64] https://packages.microsoft.com/repos/microsoft-${DISTRO}-${CODENAME}-prod ${CODENAME} main" >/etc/apt/sources.list.d/microsoft.list
 apt-get update
 ACCEPT_EULA=Y apt-get -y install unixodbc-dev msodbcsql18 libunwind8 mssql-tools18
-mv /opt/mssql-tools18 /opt/mssql-tools
+cp /opt/mssql-tools18 /opt/mssql-tools
 #Note: creating symbolic link conflicts with Go version
 #ln -s /opt/mssql-tools/bin/* /usr/local/bin/
 

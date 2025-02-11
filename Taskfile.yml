@@ -25,7 +25,7 @@ tasks:
     aliases: [dup]
     dir: fixtures/local
     cmds:
-      - docker-compose up --force-recreate --wait --detach
+      - docker compose up --force-recreate --wait --detach
     silent: true
 
   # Create the database on the fixture mssql
@@ -76,7 +76,7 @@ tasks:
     aliases: [ddown]
     dir: fixtures/local
     cmds:
-      - docker-compose down
+      - docker compose down
     silent: true
 
     # Shutdown the MSSQL docker image.
@@ -85,7 +85,7 @@ tasks:
     aliases: [ciddown]
     dir: fixtures/local
     cmds:
-      - docker-compose -f docker-compose-ci.yml down
+      - docker compose -f docker-compose-ci.yml down
     silent: true
 
   # Apply the terraform fixture. It creates an Azure Database and required SPNs
