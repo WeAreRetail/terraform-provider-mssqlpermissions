@@ -25,7 +25,7 @@ repos:
           - --hook-config=--delegate-chdir
 
   - repo: https://github.com/golangci/golangci-lint
-    rev: v1.64.2
+    rev: v1.64.4
     hooks:
       - id: golangci-lint
 
