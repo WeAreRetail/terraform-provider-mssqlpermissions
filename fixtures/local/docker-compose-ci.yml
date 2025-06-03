@@ -1,6 +1,6 @@
 services:
   mssql-fixture:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/mssql/server:2025-latest
     container_name: mssql-fixture
     restart: unless-stopped
     ports:

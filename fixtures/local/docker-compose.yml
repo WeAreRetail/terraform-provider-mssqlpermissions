@@ -1,6 +1,6 @@
 services:
   mssql-fixture:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/mssql/server:2025-latest
     restart: unless-stopped
     ports:
       - '127.0.0.1:1434:1433'
