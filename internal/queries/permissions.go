@@ -20,7 +20,7 @@ import (
 // Returns nil if the permission is successfully denied to the role, otherwise returns an error.
 func (c *Connector) AssignPermissionToRole(ctx context.Context, db *sql.DB, role *model.Role, permission *model.Permission) error {
 	var err error
-	var stateVerb string = "GRANT"
+	var stateVerb = "GRANT"
 
 	if (permission.State != "G" && permission.State != "D" && permission.State != "") || (permission.StateDesc != "GRANT" && permission.StateDesc != "DENY" && permission.StateDesc != "") {
 		return fmt.Errorf("invalid state value, must be 'G', 'D', 'GRANT', or 'DENY'")

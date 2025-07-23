@@ -349,8 +349,8 @@ func (r *ServerRoleMembersResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
-	var loginsToAdd []*qmodel.Login = make([]*qmodel.Login, 0)
-	var loginsToRemove []*qmodel.Login = make([]*qmodel.Login, 0)
+	var loginsToAdd = make([]*qmodel.Login, 0)
+	var loginsToRemove = make([]*qmodel.Login, 0)
 
 	// Compare the members in the plan with the members in the database.
 	// If the member is in the plan but not in the database, add it.

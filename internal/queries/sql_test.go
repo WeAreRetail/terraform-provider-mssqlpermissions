@@ -1,6 +1,7 @@
 package queries
 
 import (
+	"log"
 	"testing"
 	"time"
 )
@@ -93,11 +94,15 @@ func TestConnector_connector_local_sql_authentication(t *testing.T) {
 
 	// Connecting to the database and checking if the connection is successful
 	db, err := connector.Connect() // The actual function to test
-	db.Close()
-
 	if err != nil {
 		t.Errorf("cannot connect to local server using SQL Authentication: %s", err)
+		return
 	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
 }
 
 // TestConnector_connector_azure_sql_authentication is a test function for connecting to a local server using Azure SQL authentication.
@@ -113,11 +118,15 @@ func TestConnector_connector_azure_sql_authentication(t *testing.T) {
 
 	// Connecting to the database and checking if the connection is successful
 	db, err := connector.Connect() // The actual function to test
-	db.Close()
-
 	if err != nil {
 		t.Errorf("cannot connect to local server using SQL Authentication: %s", err)
+		return
 	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
 }
 
 // TestConnector_connector_azure_aad_authentication is a test function for connecting to a local server using Azure AAD authentication.
@@ -132,9 +141,13 @@ func TestConnector_connector_azure_aad_authentication(t *testing.T) {
 	}
 
 	db, err := connector.Connect() // The actual function to test
-	db.Close()
-
 	if err != nil {
 		t.Errorf("cannot connect to local server using AAD Authentication with SPN: %s", err)
+		return
 	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
 }
