@@ -2,7 +2,7 @@ module terraform-provider-mssqlpermissions
 
 go 1.23.0
 
-toolchain go1.24.4
+toolchain go1.24.5
 
 require (
 	github.com/hashicorp/terraform-plugin-docs v0.20.1
