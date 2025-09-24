@@ -5,6 +5,7 @@ import (
 	"terraform-provider-mssqlpermissions/internal/provider/model"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -238,10 +239,10 @@ func createTestRoleDataSourceModel() model.RoleDataSourceModel {
 		TypeDescription: types.StringValue("DATABASE_ROLE"),
 		OwningPrincipal: types.StringValue("dbo"),
 		IsFixedRole:     types.BoolValue(false),
-		Members: []types.String{
+		Members: types.ListValueMust(types.StringType, []attr.Value{
 			types.StringValue("user1"),
 			types.StringValue("user2"),
-		},
+		}),
 	}
 }
 
@@ -297,9 +298,9 @@ func TestNewUserDataSource(t *testing.T) {
 func TestDataSourceModelEdgeCases(t *testing.T) {
 	t.Run("RoleWithNoMembers", func(t *testing.T) {
 		role := createTestRoleDataSourceModel()
-		role.Members = []types.String{} // Empty members
+		role.Members = types.ListValueMust(types.StringType, []attr.Value{}) // Empty members
 
-		if len(role.Members) != 0 {
+		if len(role.Members.Elements()) != 0 {
 			t.Error("Expected empty members list")
 		}
 	})
