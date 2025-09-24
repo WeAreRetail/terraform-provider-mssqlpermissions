@@ -7,6 +7,7 @@ import (
 	"terraform-provider-mssqlpermissions/internal/queries"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -68,4 +69,23 @@ func logResourceOperationComplete(ctx context.Context, resourceType, operation s
 		"resource_type": resourceType,
 		"operation":     operation,
 	})
+}
+
+// convertStringListToSlice converts a types.List to []string
+func convertStringListToSlice(ctx context.Context, stringList types.List) ([]string, *diag.Diagnostics) {
+	var strings []string
+	diags := stringList.ElementsAs(ctx, &strings, false)
+	if diags.HasError() {
+		return nil, &diags
+	}
+	return strings, nil
+}
+
+// convertStringSliceToList converts []string to types.List
+func convertStringSliceToList(ctx context.Context, strings []string) (types.List, *diag.Diagnostics) {
+	stringsList, diags := types.ListValueFrom(ctx, types.StringType, strings)
+	if diags.HasError() {
+		return types.ListUnknown(types.StringType), &diags
+	}
+	return stringsList, nil
 }

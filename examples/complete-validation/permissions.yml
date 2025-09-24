@@ -1,0 +1,6 @@
+database:
+  DENY:
+    - ALTER ANY APPLICATION ROLE
+    - ALTER ANY USER
+    - ALTER ANY ROLE
+    - CREATE ROLE

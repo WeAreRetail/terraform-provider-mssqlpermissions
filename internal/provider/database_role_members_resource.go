@@ -114,9 +114,16 @@ func (r *DatabaseRoleMembersResource) Create(ctx context.Context, req resource.C
 	}
 
 	// Add members to the role
-	for _, member := range state.Members {
+	// Convert members list to slice for processing
+	members, convertDiags := convertStringListToSlice(ctx, state.Members)
+	if convertDiags != nil {
+		resp.Diagnostics.Append(*convertDiags...)
+		return
+	}
+
+	for _, memberName := range members {
 		user := &qmodel.User{
-			Name: member.ValueString(),
+			Name: memberName,
 		}
 
 		err = connector.AddDatabaseRoleMember(ctx, db, role, user)
@@ -237,13 +244,20 @@ func (r *DatabaseRoleMembersResource) Read(ctx context.Context, req resource.Rea
 
 	// ⚠️ We need to keep the same order as the state, else terraform will detect a change.
 
+	// Convert state members to slice for processing
+	stateMembers, convertDiags := convertStringListToSlice(ctx, state.Members)
+	if convertDiags != nil {
+		resp.Diagnostics.Append(*convertDiags...)
+		return
+	}
+
 	// List the users in the State and create a list with the users in the database in the same order.
 	// After this step, we have ordered the user in the database the same way as the user in the state. But additional users from the database still need to be added.
-	futureStateMembers := make([]types.String, 0)
-	for _, stateMember := range state.Members {
+	var futureStateMembers []string
+	for _, stateMemberName := range stateMembers {
 		for _, currentMember := range members {
-			if types.StringValue(currentMember.Name) == stateMember {
-				futureStateMembers = append(futureStateMembers, types.StringValue(currentMember.Name))
+			if currentMember.Name == stateMemberName {
+				futureStateMembers = append(futureStateMembers, currentMember.Name)
 				break
 			}
 		}
@@ -252,19 +266,26 @@ func (r *DatabaseRoleMembersResource) Read(ctx context.Context, req resource.Rea
 	// Add in futureStateMembers all the users in the "members" list but not yet in the futureStateMembers list.
 	for _, currentMember := range members {
 		found := false
-		for _, stateMember := range state.Members {
-			if types.StringValue(currentMember.Name) == stateMember {
+		for _, stateMemberName := range stateMembers {
+			if currentMember.Name == stateMemberName {
 				found = true
 				break
 			}
 		}
 		if !found && currentMember.Name != "dbo" { // Ignore "dbo" as it is a special user that cannot be managed
-			futureStateMembers = append(futureStateMembers, types.StringValue(currentMember.Name))
+			futureStateMembers = append(futureStateMembers, currentMember.Name)
 		}
 	}
 
+	// Convert back to types.List
+	futureStateList, convertDiags := convertStringSliceToList(ctx, futureStateMembers)
+	if convertDiags != nil {
+		resp.Diagnostics.Append(*convertDiags...)
+		return
+	}
+
 	state.Name = types.StringValue(role.Name)
-	state.Members = futureStateMembers
+	state.Members = futureStateList
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	logResourceOperationComplete(ctx, "DatabaseRoleMembersResource", "Read")
@@ -314,18 +335,25 @@ func (r *DatabaseRoleMembersResource) Update(ctx context.Context, req resource.U
 	var usersToAdd = make([]*qmodel.User, 0)
 	var usersToRemove = make([]*qmodel.User, 0)
 
+	// Convert state members to slice for processing
+	stateMembers, convertDiags := convertStringListToSlice(ctx, state.Members)
+	if convertDiags != nil {
+		resp.Diagnostics.Append(*convertDiags...)
+		return
+	}
+
 	// Compare the members in the plan with the members in the database.
 	// If the member is in the plan but not in the database, add it.
-	for _, memberInPlan := range state.Members {
+	for _, memberName := range stateMembers {
 		found := false
 		for _, memberInDB := range membersInDB {
-			if memberInPlan.ValueString() == memberInDB.Name {
+			if memberName == memberInDB.Name {
 				found = true
 			}
 		}
 		if !found {
 			user := &qmodel.User{
-				Name: memberInPlan.ValueString(),
+				Name: memberName,
 			}
 			usersToAdd = append(usersToAdd, user)
 		}
@@ -335,8 +363,8 @@ func (r *DatabaseRoleMembersResource) Update(ctx context.Context, req resource.U
 	// If the member is in the database but not in the plan, remove it.
 	for _, memberInDB := range membersInDB {
 		found := false
-		for _, memberInPlan := range state.Members {
-			if memberInPlan.ValueString() == memberInDB.Name {
+		for _, memberName := range stateMembers {
+			if memberName == memberInDB.Name {
 				found = true
 			}
 		}

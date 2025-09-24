@@ -7,6 +7,6 @@ import (
 // RoleMembersModel is the model for the role resource.
 // It contains the necessary fields to configure the role.
 type RoleMembersModel struct {
-	Name    types.String   `tfsdk:"name"`
-	Members []types.String `tfsdk:"members"`
+	Name    types.String `tfsdk:"name"`
+	Members types.List   `tfsdk:"members"`
 }

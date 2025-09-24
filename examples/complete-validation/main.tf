@@ -6,6 +6,11 @@ terraform {
       source  = "WeAreRetail/mssqlpermissions"
       version = ">= 0.0.5"
     }
+
+    local = {
+      source  = "hashicorp/local"
+      version = ">= 2.1.0"
+    }
   }
 }
 
@@ -27,6 +32,17 @@ provider "mssqlpermissions" {
     client_id     = var.azure_client_id
     client_secret = var.azure_client_secret
   } : null
+}
+
+data "local_file" "permissions" {
+  filename = "${path.module}/permissions.yml"
+}
+
+locals {
+  permissions_deny_list_of_maps = [for permission in yamldecode(data.local_file.permissions.content).database.DENY : {
+    permission_name = permission
+    state           = "D"
+  }]
 }
 
 # Create test users
@@ -68,6 +84,13 @@ resource "mssqlpermissions_permissions_to_role" "test_permissions" {
     }
   ]
 }
+
+# Grant permissions to role
+resource "mssqlpermissions_permissions_to_role" "test_permissions_deny" {
+  role_name   = mssqlpermissions_database_role.test_role.name
+  permissions = local.permissions_deny_list_of_maps
+}
+
 
 # Data sources for validation
 data "mssqlpermissions_user" "test_user_1_data" {
