@@ -15,14 +15,8 @@ func (c *Connector) GetDatabaseRole(ctx context.Context, db *sql.DB, databaseRol
 	var err error
 
 	// Check if the database connection is nil.
-	if db == nil {
-		return nil, errors.New("database connection is nil")
-	}
-
-	// Check if the database is alive by pinging it.
-	err = db.PingContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("database ping failed: %v", err)
+	if err := c.validateDatabaseConnection(ctx, db); err != nil {
+		return nil, err
 	}
 
 	// SQL query to get a database role.
@@ -35,7 +29,7 @@ func (c *Connector) GetDatabaseRole(ctx context.Context, db *sql.DB, databaseRol
 
 	// Check for any error during the query execution.
 	if err = row.Err(); err != nil {
-		return nil, fmt.Errorf("query execution error - cannot retrieve database role: %v", err)
+		return nil, fmt.Errorf("query execution error - cannot retrieve database role: %w", err)
 	}
 
 	// Scan the result into the DatabaseRole model.
@@ -46,7 +40,7 @@ func (c *Connector) GetDatabaseRole(ctx context.Context, db *sql.DB, databaseRol
 		return nil, errors.New("database role not found")
 	} else if err != nil {
 		// Check for other scan errors.
-		return nil, fmt.Errorf("scan error - cannot retrieve database role: %v", err)
+		return nil, fmt.Errorf("scan error - cannot retrieve database role: %w", err)
 	}
 
 	return databaseRole, nil
@@ -59,25 +53,22 @@ func (c *Connector) CreateDatabaseRole(ctx context.Context, db *sql.DB, database
 	var err error
 
 	// Check if the database connection is nil.
-	if db == nil {
-		return errors.New("database connection is nil")
+	if err := c.validateDatabaseConnection(ctx, db); err != nil {
+		return err
 	}
 
-	// Check if the database is alive by pinging it.
-	err = db.PingContext(ctx)
-	if err != nil {
-		return fmt.Errorf("database ping failed: %v", err)
-	}
+	// Create a copy of the database role to avoid mutating the input parameter
+	roleCopy := *databaseRole
 
 	// Check the provided PrincipalID. Defaulting to 1 if not provided.
-	if databaseRole.PrincipalID == 0 {
-		databaseRole.PrincipalID = 1
+	if roleCopy.PrincipalID == 0 {
+		roleCopy.PrincipalID = 1
 	}
 
 	// Retrieve the user with the provided ID.
-	user, err := c.GetUser(ctx, db, &model.User{PrincipalID: databaseRole.PrincipalID})
+	user, err := c.GetUser(ctx, db, &model.User{PrincipalID: roleCopy.PrincipalID})
 	if err != nil {
-		return fmt.Errorf("cannot get user with PrincipalID equals to %d. Underlying error : %v", databaseRole.PrincipalID, err)
+		return fmt.Errorf("cannot get user with PrincipalID equals to %d. Underlying error : %w", roleCopy.PrincipalID, err)
 	}
 
 	// SQL query to get a database role.
@@ -89,11 +80,11 @@ func (c *Connector) CreateDatabaseRole(ctx context.Context, db *sql.DB, database
 	_, err = db.ExecContext(
 		ctx,
 		tsql,
-		sql.Named("database_role_name", databaseRole.Name),
+		sql.Named("database_role_name", roleCopy.Name),
 		sql.Named("user_name", user.Name))
 
 	if err != nil {
-		return fmt.Errorf("cannot create database role. Underlying sql error : %v", err)
+		return fmt.Errorf("cannot create database role. Underlying sql error : %w", err)
 	} else {
 		return nil
 	}
@@ -107,14 +98,8 @@ func (c *Connector) DeleteDatabaseRole(ctx context.Context, db *sql.DB, database
 	var err error
 
 	// Check if the database connection is nil.
-	if db == nil {
-		return errors.New("database connection is nil")
-	}
-
-	// Check if the database is alive by pinging it.
-	err = db.PingContext(ctx)
-	if err != nil {
-		return fmt.Errorf("database ping failed: %v", err)
+	if err := c.validateDatabaseConnection(ctx, db); err != nil {
+		return err
 	}
 
 	// The full TSQL script.
@@ -164,7 +149,7 @@ func (c *Connector) DeleteDatabaseRole(ctx context.Context, db *sql.DB, database
 		sql.Named("RoleName", databaseRole.Name))
 
 	if err != nil {
-		return fmt.Errorf("cannot delete database role. Underlying sql error : %v", err)
+		return fmt.Errorf("cannot delete database role. Underlying sql error : %w", err)
 	} else {
 		return nil
 	}
@@ -177,26 +162,20 @@ func (c *Connector) AddDatabaseRoleMember(ctx context.Context, db *sql.DB, datab
 	var err error
 
 	// Check if the database connection is nil.
-	if db == nil {
-		return errors.New("database connection is nil")
-	}
-
-	// Check if the database is alive by pinging it.
-	err = db.PingContext(ctx)
-	if err != nil {
-		return fmt.Errorf("database ping failed: %v", err)
+	if err := c.validateDatabaseConnection(ctx, db); err != nil {
+		return err
 	}
 
 	// Validate the provided user.
 	user, err = c.GetUser(ctx, db, user)
 	if err != nil {
-		return fmt.Errorf("cannot retrieve the user. Underlying error : %v", err)
+		return fmt.Errorf("cannot retrieve the user. Underlying error : %w", err)
 	}
 
 	// Validate the provided database role.
 	databaseRole, err = c.GetDatabaseRole(ctx, db, databaseRole)
 	if err != nil {
-		return fmt.Errorf("cannot retrieve the database role. Underlying error : %v", err)
+		return fmt.Errorf("cannot retrieve the database role. Underlying error : %w", err)
 	}
 
 	// Define the query to add the user to the database role.
@@ -209,7 +188,7 @@ func (c *Connector) AddDatabaseRoleMember(ctx context.Context, db *sql.DB, datab
 	_, err = db.ExecContext(ctx, tsql, sql.Named("database_role_name", databaseRole.Name), sql.Named("user_name", user.Name))
 
 	if err != nil {
-		return fmt.Errorf("cannot add user to database role. Underlying sql error : %v", err)
+		return fmt.Errorf("cannot add user to database role. Underlying sql error : %w", err)
 	} else {
 		return nil
 	}
@@ -222,7 +201,7 @@ func (c *Connector) AddDatabaseRoleMembers(ctx context.Context, db *sql.DB, data
 	for _, u := range user {
 		err := c.AddDatabaseRoleMember(ctx, db, databaseRole, u)
 		if err != nil {
-			return fmt.Errorf("cannot add user to database role. Underlying error : %v", err)
+			return fmt.Errorf("cannot add user to database role. Underlying error : %w", err)
 		}
 	}
 	return nil
@@ -235,26 +214,20 @@ func (c *Connector) RemoveDatabaseRoleMember(ctx context.Context, db *sql.DB, da
 	var err error
 
 	// Check if the database connection is nil.
-	if db == nil {
-		return errors.New("database connection is nil")
-	}
-
-	// Check if the database is alive by pinging it.
-	err = db.PingContext(ctx)
-	if err != nil {
-		return fmt.Errorf("database ping failed: %v", err)
+	if err := c.validateDatabaseConnection(ctx, db); err != nil {
+		return err
 	}
 
 	// Validate the provided user.
 	user, err = c.GetUser(ctx, db, user)
 	if err != nil {
-		return fmt.Errorf("cannot retrieve the user. Underlying error : %v", err)
+		return fmt.Errorf("cannot retrieve the user. Underlying error : %w", err)
 	}
 
 	// Validate the provided database role.
 	databaseRole, err = c.GetDatabaseRole(ctx, db, databaseRole)
 	if err != nil {
-		return fmt.Errorf("cannot retrieve the database role. Underlying error : %v", err)
+		return fmt.Errorf("cannot retrieve the database role. Underlying error : %w", err)
 	}
 
 	// Define the query to remove the user from the database role.
@@ -267,7 +240,7 @@ func (c *Connector) RemoveDatabaseRoleMember(ctx context.Context, db *sql.DB, da
 	_, err = db.ExecContext(ctx, tsql, sql.Named("database_role_name", databaseRole.Name), sql.Named("user_name", user.Name))
 
 	if err != nil {
-		return fmt.Errorf("cannot remove user from database role. Underlying sql error : %v", err)
+		return fmt.Errorf("cannot remove user from database role. Underlying sql error : %w", err)
 	} else {
 		return nil
 	}
@@ -280,7 +253,7 @@ func (c *Connector) RemoveDatabaseRoleMembers(ctx context.Context, db *sql.DB, d
 	for _, u := range user {
 		err := c.RemoveDatabaseRoleMember(ctx, db, databaseRole, u)
 		if err != nil {
-			return fmt.Errorf("cannot remove user from database role. Underlying error : %v", err)
+			return fmt.Errorf("cannot remove user from database role. Underlying error : %w", err)
 		}
 	}
 	return nil
@@ -306,19 +279,13 @@ func (c *Connector) GetDatabaseRoleMembers(ctx context.Context, db *sql.DB, data
 	}
 
 	// Check if the database connection is nil.
-	if db == nil {
-		return nil, errors.New("database connection is nil")
+	if err := c.validateDatabaseConnection(ctx, db); err != nil {
+		return nil, err
 	}
 
 	// Check if the database role is nil.
 	if databaseRole == nil {
 		return nil, errors.New("database role is nil")
-	}
-
-	// Check if the database is alive by pinging it.
-	err = db.PingContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("database ping failed: %v", err)
 	}
 
 	// SQL query to get the members of a database role.
@@ -335,12 +302,17 @@ func (c *Connector) GetDatabaseRoleMembers(ctx context.Context, db *sql.DB, data
 	// Execute the query.
 	rows, err := db.QueryContext(ctx, query, sql.Named("name", databaseRole.Name))
 	if err != nil {
-		return nil, fmt.Errorf("query execution error - cannot retrieve database role members: %v", err)
+		return nil, fmt.Errorf("query execution error - cannot retrieve database role members: %w", err)
 	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			fmt.Printf("error closing rows: %v\n", closeErr)
+		}
+	}()
 
 	// Check for any error during the query execution.
 	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("query execution error - cannot retrieve database role members: %v", err)
+		return nil, fmt.Errorf("query execution error - cannot retrieve database role members: %w", err)
 	}
 
 	// Scan the result into the DatabaseRole model.
@@ -358,7 +330,7 @@ func (c *Connector) GetDatabaseRoleMembers(ctx context.Context, db *sql.DB, data
 			&result.AuthenticationTypeDesc,
 			&result.DefaultLanguageName)
 		if err != nil {
-			return nil, fmt.Errorf("scan error - cannot retrieve database role members: %v", err)
+			return nil, fmt.Errorf("scan error - cannot retrieve database role members: %w", err)
 		}
 
 		user := &model.User{
@@ -367,7 +339,7 @@ func (c *Connector) GetDatabaseRoleMembers(ctx context.Context, db *sql.DB, data
 
 		user, err = c.GetUser(ctx, db, user)
 		if err != nil {
-			return nil, fmt.Errorf("cannot retrieve the user. Underlying error : %v", err)
+			return nil, fmt.Errorf("cannot retrieve the user. Underlying error : %w", err)
 		}
 
 		users = append(users, user)
@@ -375,7 +347,7 @@ func (c *Connector) GetDatabaseRoleMembers(ctx context.Context, db *sql.DB, data
 
 	// Return the retrieved database role members.
 	if err != nil {
-		return nil, fmt.Errorf("cannot retrieve database role members. Underlying sql error : %v", err)
+		return nil, fmt.Errorf("cannot retrieve database role members. Underlying sql error : %w", err)
 	} else {
 		return users, nil
 	}

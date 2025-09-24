@@ -1,16 +1,10 @@
 resource "mssqlpermissions_database_role" "role" {
-  config = {
-    server_fqdn   = "mssql-fixture"
-    server_port   = 1433
-    database_name = "ApplicationDB"
-
-    sql_login = {
-      username = "sa"
-      password = "P@ssw0rd"
-    }
-  }
-
   name = "my-database-role"
+}
+
+# Manage role members separately using the dedicated resource
+resource "mssqlpermissions_database_role_members" "role_members" {
+  name = mssqlpermissions_database_role.role.name
   members = [
     "fixtureOne",
     "fixtureTwo",

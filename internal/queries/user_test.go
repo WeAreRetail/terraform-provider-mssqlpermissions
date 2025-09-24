@@ -1,3 +1,5 @@
+//go:build integration
+
 package queries
 
 import (
@@ -19,9 +21,8 @@ func TestConnector_CreateUser(t *testing.T) {
 			name:      "create-on-LocalSQL-Contained",
 			connector: testConnectors.localSQL,
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			wantErr: false,
 		},
@@ -29,8 +30,7 @@ func TestConnector_CreateUser(t *testing.T) {
 			name:      "create-on-LocalSQL-Contained-NoPassword",
 			connector: testConnectors.localSQL,
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Contained: true,
+				Name: generateRandomString(10),
 			},
 			wantErr: true,
 		},
@@ -40,39 +40,16 @@ func TestConnector_CreateUser(t *testing.T) {
 			user: &model.User{
 				Name:            generateRandomString(10),
 				Password:        fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained:       true,
 				DefaultLanguage: "Français",
 			},
 			wantErr: false,
-		},
-		{
-			name:      "create-on-LocalSQL-Instance",
-			connector: testConnectors.localSQL,
-			user: &model.User{
-				Name:      generateRandomString(10),
-				LoginName: generateRandomString(10),
-				Contained: false,
-			},
-			wantErr: false,
-		},
-		{
-			name:      "create-on-LocalSQL-Instance-with-DefaultLanguage",
-			connector: testConnectors.localSQL,
-			user: &model.User{
-				Name:            generateRandomString(10),
-				LoginName:       generateRandomString(10),
-				DefaultLanguage: "Français",
-				Contained:       false,
-			},
-			wantErr: true,
 		},
 		{
 			name:      "create-on-azureSQL-Contained",
 			connector: testConnectors.azureSQL,
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			wantErr: false,
 		},
@@ -94,28 +71,8 @@ func TestConnector_CreateUser(t *testing.T) {
 			ctx := context.Background()
 			db, _ := tt.connector.Connect()
 
-			// Create a login for the test if needed
-			var login *model.Login = nil
-			if tt.user.LoginName != "" {
-				login = &model.Login{
-					Name:     tt.user.LoginName,
-					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				}
-				err := tt.connector.CreateLogin(ctx, db, login)
-				if err != nil {
-					t.Errorf("Test case %s: Unable to create the login to get: %v", tt.name, err)
-					return
-				}
-			}
-
 			// Invoke the CreateUser method with the provided login model.
 			err := tt.connector.CreateUser(ctx, db, tt.user)
-
-			// Cleanup
-			var errCleanupLogin error = nil
-			if tt.user.LoginName != "" {
-				errCleanupLogin = tt.connector.DeleteLogin(ctx, db, login)
-			}
 
 			errCleanupUser := tt.connector.DeleteUser(ctx, db, tt.user)
 
@@ -128,7 +85,7 @@ func TestConnector_CreateUser(t *testing.T) {
 				return
 			} else if err == nil {
 				// Check if the cleanup was successful.
-				if errCleanupUser != nil || errCleanupLogin != nil {
+				if errCleanupUser != nil {
 					t.Errorf("Test case %s: error during cleanup = %v", tt.name, err)
 					return
 				}
@@ -156,9 +113,8 @@ func TestConnector_GetUser(t *testing.T) {
 			name:      "get-on-LocalSQL-Contained",
 			connector: testConnectors.localSQL,
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			preCreate: true,
 			wantErr:   false,
@@ -168,7 +124,6 @@ func TestConnector_GetUser(t *testing.T) {
 			connector: testConnectors.localSQL,
 			user: &model.User{
 				PrincipalID: 0,
-				Contained:   true,
 			},
 			preCreate: false,
 			wantErr:   false,
@@ -179,19 +134,7 @@ func TestConnector_GetUser(t *testing.T) {
 			user: &model.User{
 				Name:            generateRandomString(10),
 				Password:        fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained:       true,
 				DefaultLanguage: "Français",
-			},
-			preCreate: true,
-			wantErr:   false,
-		},
-		{
-			name:      "get-on-LocalSQL-Instance",
-			connector: testConnectors.localSQL,
-			user: &model.User{
-				Name:      generateRandomString(10),
-				LoginName: generateRandomString(10),
-				Contained: false,
 			},
 			preCreate: true,
 			wantErr:   false,
@@ -200,9 +143,8 @@ func TestConnector_GetUser(t *testing.T) {
 			name:      "get-on-azureSQL-Contained",
 			connector: testConnectors.azureSQL,
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			preCreate: true,
 			wantErr:   false,
@@ -212,7 +154,6 @@ func TestConnector_GetUser(t *testing.T) {
 			connector: testConnectors.azureSQL,
 			user: &model.User{
 				PrincipalID: 0,
-				Contained:   true,
 			},
 			preCreate: false,
 			wantErr:   false,
@@ -236,20 +177,6 @@ func TestConnector_GetUser(t *testing.T) {
 			ctx := context.Background()
 			db, _ := tt.connector.Connect()
 
-			// Create a login for the test if needed
-			var login *model.Login = nil
-			if tt.user.LoginName != "" && tt.preCreate {
-				login = &model.Login{
-					Name:     tt.user.LoginName,
-					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				}
-				err = tt.connector.CreateLogin(ctx, db, login)
-				if err != nil {
-					t.Errorf("Test case %s: Unable to create the login to get: %v", tt.name, err)
-					return
-				}
-			}
-
 			// Invoke the CreateUser method with the provided login model.
 			if tt.preCreate {
 				err = tt.connector.CreateUser(ctx, db, tt.user)
@@ -264,13 +191,8 @@ func TestConnector_GetUser(t *testing.T) {
 			_, err = tt.connector.GetUser(ctx, db, tt.user)
 
 			var errCleanupUser error = nil
-			var errCleanupLogin error = nil
 
 			if tt.preCreate {
-				if tt.user.LoginName != "" {
-					errCleanupLogin = tt.connector.DeleteLogin(ctx, db, login)
-					t.Logf("Cleanup login: %s", login.Name)
-				}
 				errCleanupUser = tt.connector.DeleteUser(ctx, db, tt.user)
 			}
 
@@ -283,7 +205,7 @@ func TestConnector_GetUser(t *testing.T) {
 				return
 			} else if err == nil {
 				// Check if the cleanup was successful.
-				if errCleanupUser != nil || errCleanupLogin != nil {
+				if errCleanupUser != nil {
 					t.Errorf("Test case %s: error during cleanup = %v", tt.name, err)
 					return
 				}
@@ -310,9 +232,8 @@ func TestConnector_UpdateUser(t *testing.T) {
 			name:      "update-on-LocalSQL-Contained",
 			connector: testConnectors.localSQL,
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			updatedUser: &model.User{
 				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
@@ -325,7 +246,6 @@ func TestConnector_UpdateUser(t *testing.T) {
 			user: &model.User{
 				Name:            generateRandomString(10),
 				Password:        fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained:       true,
 				DefaultLanguage: "Français",
 			},
 			updatedUser: &model.User{
@@ -335,25 +255,11 @@ func TestConnector_UpdateUser(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:      "update-on-LocalSQL-Instance",
-			connector: testConnectors.localSQL,
-			user: &model.User{
-				Name:      generateRandomString(10),
-				LoginName: generateRandomString(10),
-				Contained: false,
-			},
-			updatedUser: &model.User{
-				LoginName: generateRandomString(10),
-			},
-			wantErr: false,
-		},
-		{
 			name:      "update-on-azureSQL-Contained",
 			connector: testConnectors.azureSQL,
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			updatedUser: &model.User{
 				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
@@ -377,36 +283,6 @@ func TestConnector_UpdateUser(t *testing.T) {
 			// Set up the context and connect to the database.
 			ctx := context.Background()
 			db, _ := tt.connector.Connect()
-
-			// Create a login for the test if needed
-			var login *model.Login = nil
-			if tt.user.LoginName != "" {
-				login = &model.Login{
-					Name:     tt.user.LoginName,
-					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				}
-
-				err := tt.connector.CreateLogin(ctx, db, login)
-				if err != nil {
-					t.Errorf("Test case %s: Unable to create the login to get: %v", tt.name, err)
-					return
-				}
-			}
-
-			// Create an updated login for the test if needed
-			var updatedLogin *model.Login = nil
-			if tt.updatedUser.LoginName != "" {
-				updatedLogin = &model.Login{
-					Name:     tt.updatedUser.LoginName,
-					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				}
-
-				err := tt.connector.CreateLogin(ctx, db, login)
-				if err != nil {
-					t.Errorf("Test case %s: Unable to create the login to get: %v", tt.name, err)
-					return
-				}
-			}
 
 			tt.updatedUser.Name = tt.user.Name
 
@@ -434,19 +310,7 @@ func TestConnector_UpdateUser(t *testing.T) {
 				// Check if the cleanup was successful.
 				errCleanupUser := tt.connector.DeleteUser(ctx, db, tt.user)
 
-				// Cleanup login if needed
-
-				var errCleanupLogin error = nil
-				if tt.user.LoginName != "" {
-					errCleanupLogin = tt.connector.DeleteLogin(ctx, db, login)
-				}
-
-				var errCleanupUpdatedLogin error = nil
-				if tt.updatedUser.LoginName != "" {
-					errCleanupUpdatedLogin = tt.connector.DeleteLogin(ctx, db, updatedLogin)
-				}
-
-				if (errCleanupUser != nil) || (errCleanupLogin != nil) || (errCleanupUpdatedLogin != nil) {
+				if errCleanupUser != nil {
 					t.Errorf("Test case %s: error during cleanup = %v", tt.name, err)
 					return
 				}
@@ -472,9 +336,8 @@ func TestConnector_DeleteUser(t *testing.T) {
 			name:      "delete-on-LocalSQL-Contained",
 			connector: testConnectors.localSQL,
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			wantErr: false,
 		},
@@ -484,18 +347,7 @@ func TestConnector_DeleteUser(t *testing.T) {
 			user: &model.User{
 				Name:            generateRandomString(10),
 				Password:        fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained:       true,
 				DefaultLanguage: "Français",
-			},
-			wantErr: false,
-		},
-		{
-			name:      "delete-on-LocalSQL-Instance",
-			connector: testConnectors.localSQL,
-			user: &model.User{
-				Name:      generateRandomString(10),
-				LoginName: generateRandomString(10),
-				Contained: false,
 			},
 			wantErr: false,
 		},
@@ -503,9 +355,8 @@ func TestConnector_DeleteUser(t *testing.T) {
 			name:      "delete-on-azureSQL-Contained",
 			connector: testConnectors.azureSQL,
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			wantErr: false,
 		},
@@ -527,21 +378,6 @@ func TestConnector_DeleteUser(t *testing.T) {
 			ctx := context.Background()
 			db, _ := tt.connector.Connect()
 
-			// Create a login for the test if needed
-			var login *model.Login = nil
-			if tt.user.LoginName != "" {
-				login = &model.Login{
-					Name:     tt.user.LoginName,
-					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				}
-
-				err := tt.connector.CreateLogin(ctx, db, login)
-				if err != nil {
-					t.Errorf("Test case %s: Unable to create the login to get: %v", tt.name, err)
-					return
-				}
-			}
-
 			// Invoke the CreateUser method with the provided login model.
 			err := tt.connector.CreateUser(ctx, db, tt.user)
 
@@ -551,15 +387,6 @@ func TestConnector_DeleteUser(t *testing.T) {
 			}
 
 			err = tt.connector.DeleteUser(ctx, db, tt.user)
-
-			// Cleanup login if needed
-			if tt.user.LoginName != "" {
-				errCleanupLogin := tt.connector.DeleteLogin(ctx, db, login)
-				if errCleanupLogin != nil {
-					t.Errorf("Test case %s: error during cleanup = %v", tt.name, err)
-					return
-				}
-			}
 
 			// Restore the original database state.
 			tt.connector.Database = dbRestore

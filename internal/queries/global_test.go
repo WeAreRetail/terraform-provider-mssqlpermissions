@@ -1,9 +1,10 @@
+//go:build integration
+
 // Package queries provides functionality for handling database queries in different environments.
 package queries
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
@@ -168,11 +169,28 @@ func initConnectors() {
 }
 
 func generateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+	const firstCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+
+	if length <= 0 {
+		return ""
+	}
+
+	result := make([]byte, length)
 	randomBytes := make([]byte, length)
+
 	_, err := rand.Read(randomBytes)
 	if err != nil {
 		return ""
 	}
 
-	return base64.URLEncoding.EncodeToString(randomBytes)[:length]
+	// First character must be a letter or underscore
+	result[0] = firstCharset[int(randomBytes[0])%len(firstCharset)]
+
+	// Remaining characters can be letters, numbers, or underscores
+	for i := 1; i < length; i++ {
+		result[i] = charset[int(randomBytes[i])%len(charset)]
+	}
+
+	return string(result)
 }

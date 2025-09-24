@@ -5,8 +5,6 @@ type User struct {
 	Name            string
 	Password        string
 	External        bool
-	Contained       bool
-	LoginName       string
 	PrincipalID     int64
 	DefaultSchema   string
 	DefaultLanguage string

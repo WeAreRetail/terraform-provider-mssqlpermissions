@@ -7,7 +7,7 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}",
-            "cwd": "${workspaceFolder}/examples/data-sources/mssqlpermissions_database_role",
+            "cwd": "${workspaceFolder}/examples/complete-validation",
             "env": {
                 "GODEBUG": "netdns=cgo"
             },

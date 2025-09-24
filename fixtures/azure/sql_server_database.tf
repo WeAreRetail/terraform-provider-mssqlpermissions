@@ -58,7 +58,7 @@ resource "azurerm_mssql_database" "db" {
   sku_name  = "Basic"
 
   provisioner "local-exec" {
-    command = "/usr/bin/sqlcmd -S '${azurerm_mssql_server.sql_server.fully_qualified_domain_name}' --authentication-method ActiveDirectoryServicePrincipal -U '${azuread_service_principal.sql_admin.client_id}' -P '${azuread_application_password.sql_admin.value}' -d ${self.name} -i ${path.root}/database_schema.sql"
+    command = "/usr/local/bin/sqlcmd -S '${azurerm_mssql_server.sql_server.fully_qualified_domain_name}' --authentication-method ActiveDirectoryServicePrincipal -U '${azuread_service_principal.sql_admin.client_id}' -P '${azuread_application_password.sql_admin.value}' -d ${self.name} -i ${path.root}/database_schema.sql"
   }
 }
 
@@ -91,7 +91,6 @@ resource "local_sensitive_file" "local_env" {
                         export ARM_CLIENT_ID='${azuread_service_principal.sql_admin.client_id}'
                         export ARM_CLIENT_SECRET='${azuread_application_password.sql_admin.value}'
                         export ARM_TENANT_ID='${var.tenant_id}'
-                        export MSSQL_SERVER='${azurerm_mssql_server.sql_server.fully_qualified_domain_name}'
-                        export MSSQL_DATABASE='${azurerm_mssql_database.db.name}'
+                        export MSSQL_PORT='1433'
                          EOT
 }

@@ -1,0 +1,12 @@
+# Example configuration for local testing with Docker
+server_fqdn   = "mssql-fixture"
+server_port   = 1433
+database_name = "ApplicationDB"
+
+use_sql_auth   = true
+use_azure_auth = false
+
+sql_username = "sa"
+sql_password = "P@ssw0rd"
+
+test_user_password = "TestP@ssw0rd123"

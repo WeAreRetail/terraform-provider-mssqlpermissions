@@ -11,156 +11,458 @@ dotenv: ['.env', '.local.env', '.azure.env']
 
 tasks:
 
-  create-env-files:
-    desc: Create all env files that are necessary
-    aliases:
-      - "cef"
+  # =============================================================================
+  # Build & Development
+  # =============================================================================
+
+  build:
+    desc: Build the provider
+    cmds:
+      - go build -v .
+
+  install:
+    desc: Install the provider locally
+    deps: [build]
+    cmds:
+      - go install .
+
+  fmt:
+    desc: Format code and Terraform files
+    cmds:
+      - gofmt -s -w .      # Format with simplification
+      - go fix ./...       # Apply modernization fixes
+      - terraform fmt -recursive examples/
+
+  lint:
+    desc: Run linters
+    cmds:
+      - golangci-lint run
+
+  docs:
+    desc: Generate documentation
+    cmds:
+      - go generate ./...
+
+  dev:update:
+    desc: Update all dependencies and providers
+    aliases: [update]
+    cmds:
+      - task: go:update
+      - task: terraform:update
+      - task: docker:update
+
+  # =============================================================================
+  # Environment Setup
+  # =============================================================================
+
+  env:setup:
+    desc: Create all required environment files
+    aliases: [env]
     cmds:
       - touch .env .local.env .azure.env
-    silent: true
 
-  # Rebuild and start the MSSQL docker image.
-  local-docker-compose-up:
-    desc: Rebuild and start the MSSQL docker image.
-    aliases: [dup]
+  env:merge:
+    desc: Merge environment files for testing
+    cmds:
+      - cat .local.env .azure.env > .tests.env
+      - sed 's/export //g' .tests.env > .vscode-test.env
+
+  # =============================================================================
+  # Infrastructure Management
+  # =============================================================================
+
+  # Local Docker Infrastructure
+  infra:local:up:
+    desc: Start local MSSQL infrastructure
+    aliases: [local, lup]
     dir: fixtures/local
     cmds:
       - docker compose up --force-recreate --wait --detach
-    silent: true
 
-  # Create the database on the fixture mssql
-  local-mssql-ready:
-    desc: Create the database on the fixture mssql.
-    aliases: [lsql]
-    dir: fixtures/local
-    cmds:
-      - task: local-docker-compose-up
-      - bash ./postCreateCommand.sh ${LOCAL_SQL_PASSWORD} '.' '.'
-      - echo -e "export TF_ACC=1\nexport LOCAL_TEST=1\nexport LOCAL_MSSQL_DATABASE='ApplicationDB'\nexport LOCAL_MSSQL_USERNAME='sa'\nexport LOCAL_MSSQL_PASSWORD='${LOCAL_SQL_PASSWORD}'\nexport LOCAL_MSSQL_SERVER='mssql-fixture'" > ../../.local.env
-      - task: merge-dotenv-files
-    silent: true
-
-    # Create the database on the fixture mssql
-  local-mssql-ci-ready:
-    desc: Create the database on the fixture mssql.
-    aliases: [cilsql]
-    dir: fixtures/local
-    cmds:
-      - task: create-env-files
-      - docker compose -f docker-compose-ci.yml up --force-recreate --wait --detach
-      - bash ./postCreateCommand.sh ${LOCAL_SQL_PASSWORD} '.' '.' localhost 1434
-      - echo -e "export TF_ACC=1\nexport LOCAL_TEST=1\nexport LOCAL_MSSQL_DATABASE='ApplicationDB'\nexport LOCAL_MSSQL_USERNAME='sa'\nexport LOCAL_MSSQL_PASSWORD='${LOCAL_SQL_PASSWORD}'\nexport LOCAL_MSSQL_SERVER='mssql-fixture'" > ../../.local.env
-      - task: merge-dotenv-files
-    silent: true
-
-  test-internal-provider:
-    desc: Launch tests on internal provider for the local environment
-    env:
-      LOCAL_SQL_HOST: mssql-fixture
-      LOCAL_SQL_PORT: 1433
-    cmds:
-      - go test -v -cover ./internal/provider/
-
-  test-internal-provider-ci:
-    desc: Launch tests on internal provider for the CI
-    env:
-      CI: true
-      LOCAL_SQL_HOST: localhost
-      LOCAL_SQL_PORT: 1434
-    cmds:
-      - go test -v -cover ./internal/provider/
-
-  # Shutdown the MSSQL docker image.
-  local-docker-compose-down:
-    desc: Shutdown the MSSQL docker image.
-    aliases: [ddown]
+  infra:local:down:
+    desc: Stop local MSSQL infrastructure
+    aliases: [ldown]
     dir: fixtures/local
     cmds:
       - docker compose down
+
+  infra:local:ready:
+    desc: Setup local MSSQL database with test data
+    aliases: [local-ready, lready]
+    dir: fixtures/local
+    cmds:
+      - task: infra:local:up
+      - bash ./postCreateCommand.sh ${LOCAL_SQL_PASSWORD} '.' '.'
+      - echo -e "export TF_ACC=1\nexport LOCAL_TEST=1\nexport LOCAL_MSSQL_DATABASE='ApplicationDB'\nexport LOCAL_MSSQL_USERNAME='sa'\nexport LOCAL_MSSQL_PASSWORD='${LOCAL_SQL_PASSWORD}'\nexport LOCAL_MSSQL_SERVER='mssql-fixture'\nexport LOCAL_SQL_HOST='mssql-fixture'\nexport LOCAL_SQL_PORT='1433'" > ../../.local.env
+      - task: env:merge
     silent: true
 
-    # Shutdown the MSSQL docker image.
-  local-ci-docker-compose-down:
-    desc: Shutdown the MSSQL docker image.
-    aliases: [ciddown]
+  infra:ci:ready:
+    desc: Setup CI MSSQL database with test data
+    aliases: [ci-ready]
+    dir: fixtures/local
+    cmds:
+      - task: env:setup
+      - docker compose -f docker-compose-ci.yml up --force-recreate --wait --detach
+      - bash ./postCreateCommand.sh ${LOCAL_SQL_PASSWORD} '.' '.' localhost 1434
+      - echo -e "export TF_ACC=1\nexport LOCAL_TEST=1\nexport LOCAL_MSSQL_DATABASE='ApplicationDB'\nexport LOCAL_MSSQL_USERNAME='sa'\nexport LOCAL_MSSQL_PASSWORD='${LOCAL_SQL_PASSWORD}'\nexport LOCAL_MSSQL_SERVER='mssql-fixture'" > ../../.local.env
+      - task: env:merge
+    silent: true
+
+  infra:ci:down:
+    desc: Stop CI MSSQL infrastructure
+    aliases: [ci-down]
     dir: fixtures/local
     cmds:
       - docker compose -f docker-compose-ci.yml down
-    silent: true
 
-  # Apply the terraform fixture. It creates an Azure Database and required SPNs
-  terraform-up:
-    desc: Apply the terraform fixture. It creates an Azure Database and required SPNs
-    aliases: [tfup]
+  # Azure Infrastructure
+  infra:azure:up:
+    desc: Deploy Azure SQL infrastructure
+    aliases: [azure, tfup]
     dir: fixtures/azure
     cmds:
       - terraform init -upgrade
       - terraform apply -auto-approve
-      - task: merge-dotenv-files
-    silent: true
+      - task: env:merge
 
-  # Destroy the terraform fixture.
-  terraform-down:
-    desc: Destroy the terraform fixture.
+  infra:azure:down:
+    desc: Destroy Azure SQL infrastructure
     aliases: [tfdown]
     dir: fixtures/azure
     cmds:
       - terraform destroy -auto-approve
-    silent: true
 
-  # Apply the terraform fixture without initializing terraform first.
-  terraform-apply:
-    desc: Apply the terraform fixture without initializing terraform first.
+  infra:azure:apply:
+    desc: Apply Azure infrastructure changes (no init)
     aliases: [tfa]
     dir: fixtures/azure
     cmds:
       - terraform apply -auto-approve
-      - task: merge-dotenv-files
-    silent: true
+      - task: env:merge
 
-  # Reset Azure SQL Database and server by tainted them.
-  terraform-reset-azure-db:
-    desc: Reset Azure SQL Database and server by tainted them.
-    aliases: [tfradb]
+  infra:azure:reset:
+    desc: Reset Azure SQL Database and server
+    aliases: [azure-reset, tfradb]
     dir: fixtures/azure
     cmds:
       - terraform taint azurerm_mssql_server.sql_server
       - terraform taint azurerm_mssql_database.db
       - terraform apply -auto-approve
-      - task: merge-dotenv-files
+      - task: env:merge
+
+  # =============================================================================
+  # Testing
+  # =============================================================================
+
+  test:
+    desc: Run unit tests (fast, no infrastructure needed)
+    aliases: [t]
+    cmds:
+      - go test -v ./internal/... -run "Test.*_Unit"
+
+  test:unit:
+    desc: Run unit tests with verbose output
+    aliases: [tu]
+    cmds:
+      - go test -v ./internal/queries -run "Test.*_Unit"
+      - go test -v ./internal/provider -run "Test.*_Unit"
+
+  test:integration:
+    desc: Run integration tests (requires local infrastructure)
+    aliases: [ti]
+    deps: ["infra:local:ready"]
+    cmds:
+      - go test -tags=integration -v ./internal/queries
+
+  test:integration:azure:
+    desc: Run integration tests against Azure infrastructure
+    aliases: [tia]
+    deps: ["infra:azure:reset"]
+    cmds:
+      - go test -tags=integration -v ./internal/queries
+
+  test:acceptance:
+    desc: Run Terraform acceptance tests (TF_ACC=1)
+    aliases: [testacc, ta]
+    env:
+      TF_ACC: "1"
+    deps: ["infra:local:ready"]
+    cmds:
+      - go test -v ./internal/provider -timeout 120m
+
+  test:ci:acceptance:
+    desc: Run Terraform acceptance tests (TF_ACC=1)
+    aliases: [testciacc, tca]
+    env:
+      TF_ACC: "1"
+      CI: true
+      LOCAL_SQL_HOST: localhost
+      LOCAL_SQL_PORT: 1434
+    deps: ["infra:ci:ready"]
+    cmds:
+      - go test -v ./internal/provider -timeout 120m
+
+  test:coverage:
+    desc: Generate test coverage reports
+    aliases: [tc, coverage]
+    cmds:
+      - go test -cover ./internal/queries -coverprofile=coverage-queries.out -run "Test.*_Unit"
+      - go test -cover ./internal/provider -coverprofile=coverage-provider.out -run "Test.*_Unit"
+      - go tool cover -html=coverage-queries.out -o coverage-queries.html
+      - go tool cover -html=coverage-provider.out -o coverage-provider.html
+      - "echo 'Coverage reports: coverage-queries.html, coverage-provider.html'"
+
+  test:all:
+    desc: Run complete test suite (unit + integration + acceptance)
+    aliases: [test-all]
+    deps: ["infra:local:ready"]
+    cmds:
+      - task: test:unit
+      - task: test:integration
+      - task: test:acceptance
+
+  # =============================================================================
+  # Maintenance & Updates
+  # =============================================================================
+
+  go:update:
+    desc: Update Go dependencies and tidy go.mod
+    aliases: [go-update]
+    cmds:
+      - go get -u ./...
+      - go mod tidy
+
+  terraform:update:
+    desc: Update Terraform providers in Azure fixture
+    aliases: [tf-update]
+    dir: fixtures/azure
+    cmds:
+      - terraform init -upgrade
+
+  docker:update:
+    desc: Update Docker images in local fixture
+    aliases: [docker-update]
+    dir: fixtures/local
+    cmds:
+      - docker compose pull
+      - docker compose build --pull
+
+  # =============================================================================
+  # Manual Validation
+  # =============================================================================
+
+  validate:
+    desc: Run manual validation with real Terraform configuration
+    aliases: [validate-all]
+    deps: [install]
+    cmds:
+      - task: validate:local
+
+  validate:local:
+    desc: Run validation against local Docker infrastructure (use INTERACTIVE=1 for manual checkpoints)
+    aliases: [validate-local, vl]
+    deps: ["infra:local:ready", "install"]
+    dir: examples/complete-validation
     silent: true
-
-  # Merge environment variables
-  merge-dotenv-files:
-    desc: Merge environment variables
-    dir: "."
+    vars:
+      INTERACTIVE: '{{default "0" .INTERACTIVE}}'
     cmds:
-      - cat .local.env .azure.env > .tests.env
-      - sed 's/export //g' .tests.env > .vscode-test.env
+      - cp terraform.tfvars.local.example terraform.tfvars
+      - terraform init
+      - terraform plan
+      - |
+        if [ "{{.INTERACTIVE}}" = "1" ]; then
+          echo "📋 Review the plan above. Press Enter to continue with apply, or Ctrl+C to cancel..."
+          read
+        fi
+      - terraform apply -auto-approve
+      - terraform output
+      - echo "✅ Local validation completed successfully!"
+      - |
+        if [ "{{.INTERACTIVE}}" = "1" ]; then
+          echo "🧹 Cleaning up resources..."
+          echo "🛑 Press Enter to destroy resources, or Ctrl+C to keep them..."
+          read
+        else
+          echo "🧹 Cleaning up resources..."
+        fi
+      - terraform destroy -auto-approve
+
+  validate:azure:
+    desc: Run validation against Azure infrastructure (use INTERACTIVE=1 for manual checkpoints)
+    aliases: [validate-azure, va]
+    deps: ["infra:azure:reset", "install"]
+    dir: examples/complete-validation
     silent: true
-
-  # Reset the local fixture database and run tests
-  go-test-queries-local:
-    desc: Reset the local fixture database and run tests.
-    aliases: [gtql]
-    dir: queries
+    vars:
+      INTERACTIVE: '{{default "0" .INTERACTIVE}}'
     cmds:
-      - task: local-mssql-ready
-      - go test -v
+      - cp terraform.tfvars.azure.example terraform.tfvars
+      - |
+        cat > terraform.tfvars << EOF
+        server_fqdn   = "${AZURE_MSSQL_SERVER}"
+        server_port   = ${MSSQL_PORT}
+        database_name = "${AZURE_MSSQL_DATABASE}"
 
-  # Reset the local fixture database and run tests
-  go-test-queries-azure:
-    desc: Reset the local fixture database and run tests.
-    aliases: [gtqa]
-    dir: queries
-    cmds:
-      - task: terraform-reset-azure-db
-      - go test -v
+        use_sql_auth   = false
+        use_azure_auth = true
 
-  # Launch all test
-  go-test-all:
-    desc: Launch all test
-    aliases: [gta]
-    dir: queries
+        azure_tenant_id     = "${AZURE_TENANT_ID}"
+        azure_client_id     = "${AZURE_CLIENT_ID}"
+        azure_client_secret = "${AZURE_CLIENT_SECRET}"
+        EOF
+      - terraform init
+      - terraform plan
+      - |
+        if [ "{{.INTERACTIVE}}" = "1" ]; then
+          echo "📋 Review the plan above. Press Enter to continue with apply, or Ctrl+C to cancel..."
+          read
+        fi
+      - terraform apply -auto-approve
+      - terraform output
+      - echo "✅ Azure validation completed successfully!"
+      - |
+        if [ "{{.INTERACTIVE}}" = "1" ]; then
+          echo "🧹 Cleaning up resources..."
+          echo "🛑 Press Enter to destroy resources, or Ctrl+C to keep them..."
+          read
+        else
+          echo "🧹 Cleaning up resources..."
+        fi
+      - terraform destroy -auto-approve
+
+  validate:plan-only:
+    desc: Validate Terraform configurations without applying (dry-run)
+    aliases: [validate-plan, vp]
+    deps: [install]
+    dir: examples/complete-validation
+    silent: true
     cmds:
-      - go test -v
+      - cp terraform.tfvars.local.example terraform.tfvars
+      - terraform init
+      - terraform validate
+      - terraform plan
+      - echo "✅ Terraform configuration is valid!"
+
+  validate:examples:
+    desc: Validate all example configurations
+    aliases: [validate-examples, ve]
+    deps: [install]
+    silent: true
+    cmds:
+      - echo "🔍 Validating all example configurations..."
+      - |
+        failed_count=0
+        total_count=0
+
+        # Find all directories containing .tf files
+        for example_dir in $(find examples -name "*.tf" -type f | sed 's|/[^/]*$||' | sort -u); do
+          if [ -d "$example_dir" ] && [ "$(ls "$example_dir"/*.tf 2>/dev/null | wc -l)" -gt 0 ]; then
+            echo "📁 Validating $example_dir"
+            total_count=$((total_count + 1))
+
+            cd "$example_dir"
+
+            # Check if directory has multiple provider blocks (common in provider examples)
+            provider_count=$(grep -l "provider \"" *.tf 2>/dev/null | wc -l)
+
+            if [ "$provider_count" -gt 1 ] && [ "$(basename $(pwd))" = "provider" ]; then
+              echo "   ℹ️  $example_dir - SKIPPED (multiple provider examples)"
+              total_count=$((total_count - 1))
+            elif terraform init -backend=false >/dev/null 2>&1 && terraform validate >/dev/null 2>&1; then
+              echo "   ✅ $example_dir - PASSED"
+            else
+              echo "   ❌ $example_dir - FAILED"
+              echo "      Running detailed validation:"
+              terraform init -backend=false
+              terraform validate
+              failed_count=$((failed_count + 1))
+            fi
+            cd - >/dev/null
+          fi
+        done
+
+        echo ""
+        echo "📊 Validation Summary:"
+        echo "   Total examples: $total_count"
+        echo "   Passed: $((total_count - failed_count))"
+        echo "   Failed: $failed_count"
+
+        if [ $failed_count -eq 0 ]; then
+          echo "✅ All examples validated successfully!"
+        else
+          echo "❌ $failed_count example(s) failed validation!"
+          exit 1
+        fi
+
+  validate:examples:all:
+    desc: Validate all example configurations including individual provider files
+    aliases: [validate-examples-all, vea]
+    deps: [install]
+    silent: true
+    cmds:
+      - echo "🔍 Validating all example configurations (including individual files)..."
+      - |
+        failed_count=0
+        total_count=0
+
+        # First validate regular example directories
+        for example_dir in $(find examples -name "*.tf" -type f | sed 's|/[^/]*$||' | sort -u); do
+          if [ -d "$example_dir" ] && [ "$(ls "$example_dir"/*.tf 2>/dev/null | wc -l)" -gt 0 ]; then
+            provider_count=$(grep -l "provider \"" "$example_dir"/*.tf 2>/dev/null | wc -l)
+
+            if [ "$provider_count" -gt 1 ] && [ "$(basename "$example_dir")" = "provider" ]; then
+              # Handle provider directory specially - validate each file individually
+              echo "📁 Validating $example_dir (individual files)"
+              for tf_file in "$example_dir"/*.tf; do
+                if [ -f "$tf_file" ] && grep -q "provider \"" "$tf_file"; then
+                  file_name=$(basename "$tf_file")
+                  echo "📄 Validating $tf_file"
+                  total_count=$((total_count + 1))
+
+                  # Create temporary directory for individual file validation
+                  temp_dir=$(mktemp -d)
+                  cp "$example_dir/main.tf" "$temp_dir/" 2>/dev/null || echo 'terraform { required_providers { mssqlpermissions = { source = "WeAreRetail/mssqlpermissions" } } }' > "$temp_dir/main.tf"
+                  cp "$tf_file" "$temp_dir/"
+
+                  cd "$temp_dir"
+                  if terraform init -backend=false >/dev/null 2>&1 && terraform validate >/dev/null 2>&1; then
+                    echo "   ✅ $file_name - PASSED"
+                  else
+                    echo "   ❌ $file_name - FAILED"
+                    failed_count=$((failed_count + 1))
+                  fi
+                  cd - >/dev/null
+                  rm -rf "$temp_dir"
+                fi
+              done
+            else
+              # Regular validation for other directories
+              echo "📁 Validating $example_dir"
+              total_count=$((total_count + 1))
+
+              cd "$example_dir"
+              if terraform init -backend=false >/dev/null 2>&1 && terraform validate >/dev/null 2>&1; then
+                echo "   ✅ $example_dir - PASSED"
+              else
+                echo "   ❌ $example_dir - FAILED"
+                failed_count=$((failed_count + 1))
+              fi
+              cd - >/dev/null
+            fi
+          fi
+        done
+
+        echo ""
+        echo "📊 Validation Summary:"
+        echo "   Total examples: $total_count"
+        echo "   Passed: $((total_count - failed_count))"
+        echo "   Failed: $failed_count"
+
+        if [ $failed_count -eq 0 ]; then
+          echo "✅ All examples validated successfully!"
+        else
+          echo "❌ $failed_count example(s) failed validation!"
+          exit 1
+        fi

@@ -6,10 +6,9 @@ import (
 	"terraform-provider-mssqlpermissions/internal/queries"
 	qmodel "terraform-provider-mssqlpermissions/internal/queries/model"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -20,6 +19,7 @@ import (
 var _ resource.Resource = &PermissionsResource{}
 var _ resource.ResourceWithValidateConfig = &PermissionsResource{}
 var _ resource.ResourceWithImportState = &PermissionsResource{}
+var _ resource.ResourceWithConfigure = &PermissionsResource{}
 
 func NewPermissionsResource() resource.Resource {
 	return &PermissionsResource{}
@@ -43,8 +43,6 @@ func (r *PermissionsResource) Schema(_ context.Context, req resource.SchemaReque
 		Description:         "Permissions.",
 		MarkdownDescription: "Permissions.",
 		Attributes: map[string]schema.Attribute{
-			"config": getConfigSchema(), // config is the configuration block shared by all resources and data sources.
-
 			"permissions": schema.ListNestedAttribute{
 				Description:         "A list of permissions.",
 				MarkdownDescription: "A list of permissions.",
@@ -115,51 +113,84 @@ func (r *PermissionsResource) Schema(_ context.Context, req resource.SchemaReque
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
-
-			"is_server_role": schema.BoolAttribute{
-				Description:         "Is the role a server role.",
-				MarkdownDescription: "Is the role a server role.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-			},
 		},
 	}
 }
 
 // ValidateConfig is a method that validates the configuration for the PermissionsResource.
-// It checks that the role name is not empty.
-// If the role name is empty, it adds an error to the response diagnostics.
+// It checks that the role name is not empty and validates permissions configuration.
+// If validation fails, it adds appropriate errors to the response diagnostics.
 func (r *PermissionsResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	// var config model.PermissionResourceModel
+	var config model.PermissionResourceModel
 
-	// resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
 
-	// if resp.Diagnostics.HasError() {
-	// 	return
-	// }
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
-	// if config.RoleName.ValueString() == "" {
-	// 	resp.Diagnostics.AddError("role_name is required", "role_name is required")
-	// }
+	// Validate role_name is not empty (but allow unknown values during validation)
+	if !config.RoleName.IsUnknown() && (config.RoleName.IsNull() || config.RoleName.ValueString() == "") {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("role_name"),
+			"Missing Role Name",
+			"The role_name is required and cannot be empty.",
+		)
+	}
 
-	// if config.Permissions == nil || len(config.Permissions) == 0 {
-	// 	resp.Diagnostics.AddError("permissions is required", "permissions is required")
-	// }
+	// Validate permissions array is not empty
+	if len(config.Permissions) == 0 {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("permissions"),
+			"Missing Permissions",
+			"At least one permission must be specified.",
+		)
+		return // Exit early if no permissions to validate
+	}
 
-	// // if the permission name is empty, add an error.
-	// for _, permission := range config.Permissions {
-	// 	if permission.Name.ValueString() == "" {
-	// 		resp.Diagnostics.AddError("permission_name is required", "permission_name is required")
-	// 	}
-	// }
+	// Validate each permission
+	for i, permission := range config.Permissions {
+		permissionPath := path.Root("permissions").AtListIndex(i)
 
-	// // if the permission state is empty or different than G or D, add an error.
-	// for _, permission := range config.Permissions {
-	// 	if permission.State.ValueString() != "G" && permission.State.ValueString() != "D" {
-	// 		resp.Diagnostics.AddError("permission_state must be G or D", "permission_state must be G or D")
-	// 	}
-	// }
+		// Validate permission name is not empty
+		if permission.Name.IsNull() || permission.Name.ValueString() == "" {
+			resp.Diagnostics.AddAttributeError(
+				permissionPath.AtName("permission_name"),
+				"Missing Permission Name",
+				"The permission_name is required and cannot be empty.",
+			)
+		}
+
+		// Validate permission state is G (Grant) or D (Deny)
+		if !permission.State.IsNull() {
+			state := permission.State.ValueString()
+			if state != "G" && state != "D" {
+				resp.Diagnostics.AddAttributeError(
+					permissionPath.AtName("state"),
+					"Invalid Permission State",
+					"The permission state must be 'G' (Grant) or 'D' (Deny).",
+				)
+			}
+		}
+	}
+}
+
+// Configure configures the resource with the provider configuration.
+func (r *PermissionsResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	providerConfig, ok := req.ProviderData.(*queries.Connector)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			"Expected *queries.Connector, got: %T. Please report this issue to the provider developers.",
+		)
+		return
+	}
+
+	r.connector = providerConfig
 }
 
 // Create is a method that creates a new resource based on the provided request.
@@ -168,52 +199,36 @@ func (r *PermissionsResource) ValidateConfig(ctx context.Context, req resource.V
 // If any error occurs during the process, it adds the error to the response diagnostics.
 func (r *PermissionsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var state model.PermissionResourceModel
-	var err error
-	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "PermissionsResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	logResourceOperation(ctx, "PermissionsResource", "Create")
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
+	// Use provider connector
+	connector := r.connector
 
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "PermissionsResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using helper function
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
 	// Confirm that the role exists.
-	tflog.Debug(ctx, "PermissionsResource: confirm that the role exists")
 	role := &qmodel.Role{
 		Name: state.RoleName.ValueString(),
 	}
 
-	if state.IsServerRole.ValueBool() {
-		role, err = r.connector.GetServerRole(dbCtx, db, role)
-	} else {
-		role, err = r.connector.GetDatabaseRole(dbCtx, db, role)
-	}
-
+	role, err = connector.GetDatabaseRole(ctx, db, role)
 	if err != nil {
 		resp.Diagnostics.AddError("Error getting role", err.Error())
 		return
 	}
 
 	// Assign permissions to the role.
-	tflog.Debug(ctx, "PermissionsResource: assign permissions to the role")
 	var updatedPermissions []model.PermissionModel
 
 	for _, permissionState := range state.Permissions {
@@ -222,18 +237,13 @@ func (r *PermissionsResource) Create(ctx context.Context, req resource.CreateReq
 			State: permissionState.State.ValueString(),
 		}
 
-		err = r.connector.AssignPermissionToRole(dbCtx, db, role, permission)
+		err = connector.AssignPermissionToRole(ctx, db, role, permission)
 		if err != nil {
 			resp.Diagnostics.AddError("Error granting permission to role", err.Error())
 			return
 		}
 
-		if state.IsServerRole.ValueBool() {
-			permission, err = r.connector.GetServerPermissionForRole(dbCtx, db, role, permission)
-		} else {
-			permission, err = r.connector.GetDatabasePermissionForRole(dbCtx, db, role, permission)
-		}
-
+		permission, err = connector.GetDatabasePermissionForRole(ctx, db, role, permission)
 		if err != nil {
 			resp.Diagnostics.AddError("Error getting permission for role", err.Error())
 			return
@@ -258,12 +268,8 @@ func (r *PermissionsResource) Create(ctx context.Context, req resource.CreateReq
 
 	state.Permissions = updatedPermissions
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	logResourceOperationComplete(ctx, "PermissionsResource", "Create")
 }
 
 // Delete deletes the permissions resource.
@@ -271,58 +277,42 @@ func (r *PermissionsResource) Create(ctx context.Context, req resource.CreateReq
 // If any error occurs during the deletion process, it adds an error to the response diagnostics.
 func (r *PermissionsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state model.PermissionResourceModel
-	var err error
-	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "PermissionsResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	logResourceOperation(ctx, "PermissionsResource", "Delete")
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
+	// Use provider connector
+	connector := r.connector
 
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "PermissionsResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using helper function
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
 	// Confirm that the role exists.
-	tflog.Debug(ctx, "PermissionsResource: confirm that the role exists")
 	role := &qmodel.Role{
 		Name: state.RoleName.ValueString(),
 	}
 
-	if state.IsServerRole.ValueBool() {
-		role, err = r.connector.GetServerRole(dbCtx, db, role)
-	} else {
-		role, err = r.connector.GetDatabaseRole(dbCtx, db, role)
-	}
-
+	role, err = connector.GetDatabaseRole(ctx, db, role)
 	if err != nil {
 		resp.Diagnostics.AddError("Error getting role", err.Error())
 		return
 	}
 
 	// Remove permissions from the role.
-	tflog.Debug(ctx, "PermissionsResource: remove permissions from the role")
 	for _, permissionState := range state.Permissions {
 		permission := &qmodel.Permission{
 			Name: permissionState.Name.ValueString(),
 		}
 
-		err = r.connector.RevokePermissionFromRole(dbCtx, db, role, permission)
+		err = connector.RevokePermissionFromRole(ctx, db, role, permission)
 		if err != nil {
 			resp.Diagnostics.AddError("Error revoking permission from role", err.Error())
 			return
@@ -331,11 +321,8 @@ func (r *PermissionsResource) Delete(ctx context.Context, req resource.DeleteReq
 
 	state.Permissions = []model.PermissionModel{}
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	logResourceOperationComplete(ctx, "PermissionsResource", "Delete")
 }
 
 // Read is a method of the PermissionsResource struct that implements the resource.ReadHandler interface.
@@ -344,52 +331,44 @@ func (r *PermissionsResource) Delete(ctx context.Context, req resource.DeleteReq
 // If any errors occur during the process, they are added to the response diagnostics.
 func (r *PermissionsResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state model.PermissionResourceModel
-	var err error
-	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "PermissionsResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	logResourceOperation(ctx, "PermissionsResource", "Read")
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
+	// Use provider connector
+	connector := r.connector
 
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "PermissionsResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using helper function
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
 	// Confirm that the role exists.
-	tflog.Debug(ctx, "PermissionsResource: confirm that the role exists")
 	role := &qmodel.Role{
 		Name: state.RoleName.ValueString(),
 	}
+	role, err = connector.GetDatabaseRole(ctx, db, role)
 
-	if state.IsServerRole.ValueBool() {
-		role, err = r.connector.GetServerRole(dbCtx, db, role)
-	} else {
-		role, err = r.connector.GetDatabaseRole(dbCtx, db, role)
+	// Use the centralized error handling logic
+	errorResult := HandleDatabaseRoleReadError(err)
+	if errorResult.ShouldRemoveFromState {
+		tflog.Debug(ctx, "Database role not found in database, removing from state")
+		resp.State.RemoveResource(ctx)
+		return
 	}
 
-	if err != nil {
-		resp.Diagnostics.AddError("Error getting role", err.Error())
+	if errorResult.ShouldAddError {
+		resp.Diagnostics.AddError(errorResult.ErrorMessage, err.Error())
 		return
 	}
 
 	// Get the permissions for the role.
-	tflog.Debug(ctx, "PermissionsResource: get the permissions for the role")
 	var readPermissions []model.PermissionModel
 
 	for _, permissionState := range state.Permissions {
@@ -397,12 +376,7 @@ func (r *PermissionsResource) Read(ctx context.Context, req resource.ReadRequest
 			Name: permissionState.Name.ValueString(),
 		}
 
-		if state.IsServerRole.ValueBool() {
-			permission, err = r.connector.GetServerPermissionForRole(dbCtx, db, role, permission)
-		} else {
-			permission, err = r.connector.GetDatabasePermissionForRole(dbCtx, db, role, permission)
-		}
-
+		permission, err = connector.GetDatabasePermissionForRole(ctx, db, role, permission)
 		if err != nil && err.Error() != "permissions not found" {
 			resp.Diagnostics.AddError("Error getting permission for role", err.Error())
 			return
@@ -432,11 +406,8 @@ func (r *PermissionsResource) Read(ctx context.Context, req resource.ReadRequest
 
 	state.Permissions = readPermissions
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	logResourceOperationComplete(ctx, "PermissionsResource", "Read")
 }
 
 // Update updates the PermissionsResource based on the provided UpdateRequest.
@@ -446,46 +417,31 @@ func (r *PermissionsResource) Read(ctx context.Context, req resource.ReadRequest
 func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var state model.PermissionResourceModel
 	var plan model.PermissionResourceModel
-	var err error
-	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "PermissionsResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	logResourceOperation(ctx, "PermissionsResource", "Update")
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
+	// Use provider connector
+	connector := r.connector
 
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "PermissionsResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using helper function
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
 	// Confirm that the role exists.
-	tflog.Debug(ctx, "PermissionsResource: confirm that the role exists")
 	role := &qmodel.Role{
 		Name: state.RoleName.ValueString(),
 	}
 
-	if state.IsServerRole.ValueBool() {
-		role, err = r.connector.GetServerRole(dbCtx, db, role)
-	} else {
-		role, err = r.connector.GetDatabaseRole(dbCtx, db, role)
-	}
-
+	role, err = connector.GetDatabaseRole(ctx, db, role)
 	if err != nil {
 		resp.Diagnostics.AddError("Error getting role", err.Error())
 		return
@@ -494,13 +450,12 @@ func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateReq
 	// As the permissions are defined in a list, the order is not guaranteed.
 	// Therefore, we need to delete all permissions and then re-add them.
 	// We take all the permissions in the current state and remove them.
-	tflog.Debug(ctx, "PermissionsResource: delete all permissions")
 	for _, permissionState := range state.Permissions {
 		permission := &qmodel.Permission{
 			Name: permissionState.Name.ValueString(),
 		}
 
-		err = r.connector.RevokePermissionFromRole(dbCtx, db, role, permission)
+		err = connector.RevokePermissionFromRole(ctx, db, role, permission)
 		if err != nil {
 			resp.Diagnostics.AddError("Error revoking permission from role", err.Error())
 			return
@@ -517,18 +472,13 @@ func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateReq
 			State: permissionPlan.State.ValueString(),
 		}
 
-		err = r.connector.AssignPermissionToRole(dbCtx, db, role, permission)
+		err = connector.AssignPermissionToRole(ctx, db, role, permission)
 		if err != nil {
 			resp.Diagnostics.AddError("Error granting permission to role", err.Error())
 			return
 		}
 
-		if state.IsServerRole.ValueBool() {
-			permission, err = r.connector.GetServerPermissionForRole(dbCtx, db, role, permission)
-		} else {
-			permission, err = r.connector.GetDatabasePermissionForRole(dbCtx, db, role, permission)
-		}
-
+		permission, err = connector.GetDatabasePermissionForRole(ctx, db, role, permission)
 		if err != nil {
 			resp.Diagnostics.AddError("Error getting permission for role", err.Error())
 			return
@@ -553,12 +503,8 @@ func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateReq
 
 	state.Permissions = updatedPermissions
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	logResourceOperationComplete(ctx, "PermissionsResource", "Update")
 }
 
 // ImportState implements resource.ResourceWithImportState.

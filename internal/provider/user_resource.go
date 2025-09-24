@@ -19,6 +19,7 @@ import (
 
 var _ resource.Resource = &UserResource{}
 var _ resource.ResourceWithImportState = &UserResource{}
+var _ resource.ResourceWithConfigure = &UserResource{}
 
 func NewUserResource() resource.Resource {
 	return &UserResource{}
@@ -26,6 +27,25 @@ func NewUserResource() resource.Resource {
 
 type UserResource struct {
 	connector *queries.Connector
+}
+
+// Configure is called by the framework to pass provider-level configuration to the resource.
+func (r *UserResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	// Prevent panic if provider has not been configured.
+	if req.ProviderData == nil {
+		return
+	}
+
+	connector, ok := req.ProviderData.(*queries.Connector)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			"Expected *queries.Connector, got something else. Please report this issue to the provider developers.",
+		)
+		return
+	}
+
+	r.connector = connector
 }
 
 // Metadata is a method that sets the metadata for the UserResource.
@@ -36,17 +56,15 @@ func (r *UserResource) Metadata(_ context.Context, req resource.MetadataRequest,
 }
 
 // Schema is a method that sets the schema for the UserResource.
-// It defines the attributes and their properties for the user data source.
+// It defines the attributes and their properties for the user resource.
 // The attributes include the user name, password, external flag, contained flag,
 // login name, principal id, default schema, default language, object id, and SID.
 func (r *UserResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "User data source.",
+		MarkdownDescription: "User resource.",
 
 		Attributes: map[string]schema.Attribute{
-
-			"config": getConfigSchema(), // config is the configuration block shared by all resources and data sources.
 
 			"name": schema.StringAttribute{
 				Description:         "The user name.",
@@ -71,21 +89,6 @@ func (r *UserResource) Schema(_ context.Context, req resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
 				},
-			},
-			"contained": schema.BoolAttribute{
-				Description:         "Is the user contained.",
-				MarkdownDescription: "Is the user contained.",
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(true),
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.RequiresReplace(),
-				},
-			},
-			"login_name": schema.StringAttribute{
-				Description:         "The user login name.",
-				MarkdownDescription: "The user login name.",
-				Optional:            true,
 			},
 			"principal_id": schema.Int64Attribute{
 				Description:         "The user principal id.",
@@ -118,7 +121,7 @@ func (r *UserResource) Schema(_ context.Context, req resource.SchemaRequest, res
 	}
 }
 
-// Create is a method of the UserResource struct that handles the creation of a user resource.
+// Create creates a new user resource in the database.
 // It takes a context.Context, a resource.CreateRequest, and a pointer to a resource.CreateResponse as input parameters.
 // The method retrieves the necessary information from the request, connects to the database, creates the user, and populates the state object with the created user's details.
 // If any errors occur during the process, they are added to the response's diagnostics.
@@ -128,27 +131,20 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 	var err error
 	var diags diag.Diagnostics
 
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
+	logResourceOperation(ctx, "User", "Create")
 
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "UserResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	// Use provider connector
+	connector := r.connector
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
-
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "UserResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using proper context
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
@@ -156,43 +152,32 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 		Name:            state.Name.ValueString(),
 		Password:        state.Password.ValueString(),
 		External:        state.External.ValueBool(),
-		Contained:       state.Contained.ValueBool(),
-		LoginName:       state.LoginName.ValueString(),
 		DefaultSchema:   state.DefaultSchema.ValueString(),
 		DefaultLanguage: state.DefaultLanguage.ValueString(),
 		ObjectID:        state.ObjectID.ValueString(),
 	}
 
-	tflog.Debug(ctx, "UserResource: create the user")
-	err = r.connector.CreateUser(dbCtx, db, user)
-
+	tflog.Debug(ctx, "Creating user")
+	err = connector.CreateUser(ctx, db, user)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating user", err.Error())
 		return
 	}
 
-	tflog.Debug(ctx, "UserResource: get the created user")
-	user, err = r.connector.GetUser(dbCtx, db, user)
-
+	tflog.Debug(ctx, "Retrieving created user")
+	user, err = connector.GetUser(ctx, db, user)
 	if err != nil {
 		resp.Diagnostics.AddError("Error retrieving the created user", err.Error())
 		return
 	}
 
-	tflog.Debug(ctx, "userDataSource: populate the state object (model.UserModel) ")
+	tflog.Debug(ctx, "Populating user state")
 	state.Name = types.StringValue(user.Name)
 	state.External = types.BoolValue(user.External)
-	state.Contained = types.BoolValue(user.Contained)
 	state.PrincipalID = types.Int64Value(user.PrincipalID)
 	state.DefaultSchema = types.StringValue(user.DefaultSchema)
 	state.DefaultLanguage = types.StringValue(user.DefaultLanguage)
 	state.SID = types.StringValue(user.SID)
-
-	if user.LoginName == "" {
-		state.LoginName = types.StringNull()
-	} else {
-		state.LoginName = types.StringValue(user.LoginName)
-	}
 
 	if user.ObjectID == "" {
 		state.ObjectID = types.StringNull()
@@ -205,6 +190,8 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	logResourceOperationComplete(ctx, "User", "Create")
 }
 
 // Delete is a method of the UserResource struct that handles the deletion of a user resource.
@@ -214,29 +201,21 @@ func (r *UserResource) Create(ctx context.Context, req resource.CreateRequest, r
 func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state model.UserResourceModel
 	var err error
-	var diags diag.Diagnostics
+
+	logResourceOperation(ctx, "User", "Delete")
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "UserResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	// Use provider connector
+	connector := r.connector
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
-
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "UserResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using proper context
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
@@ -244,13 +223,14 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 		Name: state.Name.ValueString(),
 	}
 
-	tflog.Debug(ctx, "UserResource: create the user")
-	err = r.connector.DeleteUser(dbCtx, db, user)
-
+	tflog.Debug(ctx, "Deleting user")
+	err = connector.DeleteUser(ctx, db, user)
 	if err != nil {
 		resp.Diagnostics.AddError("Error deleting user", err.Error())
 		return
 	}
+
+	logResourceOperationComplete(ctx, "User", "Delete")
 }
 
 // Read is a method of the UserResource struct that handles the reading of a user resource.
@@ -260,29 +240,21 @@ func (r *UserResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state model.UserResourceModel
 	var err error
-	var diags diag.Diagnostics
+
+	logResourceOperation(ctx, "User", "Read")
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "UserResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	// Use provider connector
+	connector := r.connector
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
-
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "UserResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using proper context
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
@@ -292,36 +264,30 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		External:    state.External.ValueBool(),
 	}
 
-	tflog.Debug(ctx, "UserResource: get the user")
-	user, err = r.connector.GetUser(dbCtx, db, user)
+	tflog.Debug(ctx, "Reading user from database")
+	user, err = connector.GetUser(ctx, db, user)
 
-	if err != nil && err.Error() != "user not found" {
-		resp.Diagnostics.AddError("Error getting user", err.Error())
+	// Use the centralized error handling logic
+	errorResult := HandleUserReadError(err)
+	if errorResult.ShouldRemoveFromState {
+		tflog.Debug(ctx, "User not found in database, removing from state")
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	tflog.Debug(ctx, "userDataSource: populate the state object (model.UserModel) ")
-
-	if user == nil {
-		state = model.UserResourceModel{
-			Config: state.Config,
-		}
-	} else {
-		state.Name = types.StringValue(user.Name)
-		state.External = types.BoolValue(user.External)
-		state.Contained = types.BoolValue(user.Contained)
-		state.LoginName = types.StringValue(user.LoginName)
-		state.PrincipalID = types.Int64Value(user.PrincipalID)
-		state.DefaultSchema = types.StringValue(user.DefaultSchema)
-		state.DefaultLanguage = types.StringValue(user.DefaultLanguage)
-		state.SID = types.StringValue(user.SID)
+	if errorResult.ShouldAddError {
+		resp.Diagnostics.AddError(errorResult.ErrorMessage, err.Error())
+		return
 	}
 
-	if user.LoginName == "" {
-		state.LoginName = types.StringNull()
-	} else {
-		state.LoginName = types.StringValue(user.LoginName)
-	}
+	tflog.Debug(ctx, "Populating user state")
+
+	state.Name = types.StringValue(user.Name)
+	state.External = types.BoolValue(user.External)
+	state.PrincipalID = types.Int64Value(user.PrincipalID)
+	state.DefaultSchema = types.StringValue(user.DefaultSchema)
+	state.DefaultLanguage = types.StringValue(user.DefaultLanguage)
+	state.SID = types.StringValue(user.SID)
 
 	if user.ObjectID == "" {
 		state.ObjectID = types.StringNull()
@@ -329,11 +295,12 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		state.ObjectID = types.StringValue(user.ObjectID)
 	}
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	logResourceOperationComplete(ctx, "User", "Read")
 }
 
 // Update is a method of the UserResource struct that handles the updating of a user resource.
@@ -344,29 +311,21 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 
 	var state model.UserResourceModel
 	var err error
-	var diags diag.Diagnostics
+
+	logResourceOperation(ctx, "User", "Update")
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "UserResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	// Use provider connector
+	connector := r.connector
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
-
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "UserResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using proper context
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
@@ -374,42 +333,31 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		Name:            state.Name.ValueString(),
 		Password:        state.Password.ValueString(),
 		External:        state.External.ValueBool(),
-		Contained:       state.Contained.ValueBool(),
-		LoginName:       state.LoginName.ValueString(),
 		DefaultSchema:   state.DefaultSchema.ValueString(),
 		DefaultLanguage: state.DefaultLanguage.ValueString(),
 	}
 
-	tflog.Debug(ctx, "UserResource: create the user")
-	err = r.connector.UpdateUser(dbCtx, db, user)
-
+	tflog.Debug(ctx, "Updating user")
+	err = connector.UpdateUser(ctx, db, user)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating user", err.Error())
+		resp.Diagnostics.AddError("Error updating user", err.Error())
 		return
 	}
 
-	tflog.Debug(ctx, "UserResource: get the created user")
-	user, err = r.connector.GetUser(dbCtx, db, user)
-
+	tflog.Debug(ctx, "Retrieving updated user")
+	user, err = connector.GetUser(ctx, db, user)
 	if err != nil {
-		resp.Diagnostics.AddError("Error retrieving the created user", err.Error())
+		resp.Diagnostics.AddError("Error retrieving the updated user", err.Error())
 		return
 	}
 
-	tflog.Debug(ctx, "userDataSource: populate the state object (model.UserModel) ")
+	tflog.Debug(ctx, "Populating updated user state")
 	state.Name = types.StringValue(user.Name)
 	state.External = types.BoolValue(user.External)
-	state.Contained = types.BoolValue(user.Contained)
 	state.PrincipalID = types.Int64Value(user.PrincipalID)
 	state.DefaultSchema = types.StringValue(user.DefaultSchema)
 	state.DefaultLanguage = types.StringValue(user.DefaultLanguage)
 	state.SID = types.StringValue(user.SID)
-
-	if user.LoginName == "" {
-		state.LoginName = types.StringNull()
-	} else {
-		state.LoginName = types.StringValue(user.LoginName)
-	}
 
 	if user.ObjectID == "" {
 		state.ObjectID = types.StringNull()
@@ -417,11 +365,12 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		state.ObjectID = types.StringValue(user.ObjectID)
 	}
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	logResourceOperationComplete(ctx, "User", "Update")
 }
 
 // ImportState implements resource.ResourceWithImportState.

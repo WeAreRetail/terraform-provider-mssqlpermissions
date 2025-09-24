@@ -21,8 +21,6 @@ type PermissionModel struct {
 
 // PermissionResourceModel is the model for the permission resource.
 type PermissionResourceModel struct {
-	Config       *ConfigModel      `tfsdk:"config"`
-	Permissions  []PermissionModel `tfsdk:"permissions"`
-	RoleName     types.String      `tfsdk:"role_name"`
-	IsServerRole types.Bool        `tfsdk:"is_server_role"`
+	Permissions []PermissionModel `tfsdk:"permissions"`
+	RoleName    types.String      `tfsdk:"role_name"`
 }

@@ -6,8 +6,6 @@ import (
 	"terraform-provider-mssqlpermissions/internal/queries"
 	qmodel "terraform-provider-mssqlpermissions/internal/queries/model"
 
-	"github.com/hashicorp/terraform-plugin-framework/diag"
-
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -18,6 +16,7 @@ import (
 
 var _ resource.Resource = &DatabaseRoleResource{}
 var _ resource.ResourceWithImportState = &DatabaseRoleResource{}
+var _ resource.ResourceWithConfigure = &DatabaseRoleResource{}
 
 func NewDatabaseRoleResource() resource.Resource {
 	return &DatabaseRoleResource{}
@@ -25,6 +24,25 @@ func NewDatabaseRoleResource() resource.Resource {
 
 type DatabaseRoleResource struct {
 	connector *queries.Connector
+}
+
+// Configure is called by the framework to pass provider-level configuration to the resource.
+func (r *DatabaseRoleResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	// Prevent panic if provider has not been configured.
+	if req.ProviderData == nil {
+		return
+	}
+
+	connector, ok := req.ProviderData.(*queries.Connector)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			"Expected *queries.Connector, got something else. Please report this issue to the provider developers.",
+		)
+		return
+	}
+
+	r.connector = connector
 }
 
 // Metadata is a method that sets the metadata for the DatabaseRoleResource.
@@ -42,8 +60,6 @@ func (r *DatabaseRoleResource) Schema(_ context.Context, req resource.SchemaRequ
 		MarkdownDescription: "Database Role Resource",
 
 		Attributes: map[string]schema.Attribute{
-			"config": getConfigSchema(), // config is the configuration block shared by all resources and data sources.
-
 			"name": schema.StringAttribute{
 				Description:         "The database role's name.",
 				MarkdownDescription: "The database role's name.",
@@ -51,12 +67,6 @@ func (r *DatabaseRoleResource) Schema(_ context.Context, req resource.SchemaRequ
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
-			},
-			"members": schema.ListAttribute{
-				Description:         "The database role's members.",
-				MarkdownDescription: "The database role's members.",
-				Optional:            true,
-				ElementType:         types.StringType,
 			},
 			"principal_id": schema.Int64Attribute{
 				Description:         "Database role principal id.",
@@ -93,32 +103,22 @@ func (r *DatabaseRoleResource) Schema(_ context.Context, req resource.SchemaRequ
 // It updates the state object with the created role information.
 // If any error occurs during the process, it adds the error to the response diagnostics.
 func (r *DatabaseRoleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-
 	var state model.RoleModel
-	var err error
-	var diags diag.Diagnostics
+
+	logResourceOperation(ctx, "DatabaseRole", "Create")
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "DatabaseRoleResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	// Use provider connector
+	connector := r.connector
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
-
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "DatabaseRoleResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using proper context
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
@@ -126,23 +126,18 @@ func (r *DatabaseRoleResource) Create(ctx context.Context, req resource.CreateRe
 		Name: state.Name.ValueString(),
 	}
 
-	tflog.Debug(ctx, "DatabaseRoleResource: create the role")
-	err = r.connector.CreateDatabaseRole(dbCtx, db, role)
-
+	err = connector.CreateDatabaseRole(ctx, db, role)
 	if err != nil {
 		resp.Diagnostics.AddError("Error creating role", err.Error())
 		return
 	}
 
-	tflog.Debug(ctx, "DatabaseRoleResource: get the created role")
-	role, err = r.connector.GetDatabaseRole(dbCtx, db, role)
-
+	role, err = connector.GetDatabaseRole(ctx, db, role)
 	if err != nil {
 		resp.Diagnostics.AddError("Error retrieving the created role", err.Error())
 		return
 	}
 
-	tflog.Debug(ctx, "userDataSource: populate the state object (model.UserModel) ")
 	state.Name = types.StringValue(role.Name)
 	state.PrincipalID = types.Int64Value(role.PrincipalID)
 	state.Type = types.StringValue(role.Type)
@@ -150,25 +145,8 @@ func (r *DatabaseRoleResource) Create(ctx context.Context, req resource.CreateRe
 	state.OwningPrincipal = types.StringValue(role.OwningPrincipal)
 	state.IsFixedRole = types.BoolValue(role.IsFixedRole)
 
-	// Add the members to the role
-	for _, member := range state.Members {
-		user := &qmodel.User{
-			Name: member.ValueString(),
-		}
-
-		tflog.Debug(ctx, "DatabaseRoleResource: add the member to the role")
-		err = r.connector.AddDatabaseRoleMember(dbCtx, db, role, user)
-		if err != nil {
-			resp.Diagnostics.AddError("Error adding user to role", err.Error())
-			return
-		}
-	}
-
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	logResourceOperationComplete(ctx, "DatabaseRole", "Create")
 }
 
 // Delete deletes a database role.
@@ -179,30 +157,21 @@ func (r *DatabaseRoleResource) Create(ctx context.Context, req resource.CreateRe
 // If there is an error connecting to the database or deleting the role, it adds an error diagnostic to the response.
 func (r *DatabaseRoleResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	var state model.RoleModel
-	var err error
-	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "DatabaseRoleResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	logResourceOperation(ctx, "DatabaseRoleResource", "Delete")
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
+	// Use provider connector
+	connector := r.connector
 
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "DatabaseRoleResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using helper function
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
@@ -210,13 +179,13 @@ func (r *DatabaseRoleResource) Delete(ctx context.Context, req resource.DeleteRe
 		Name: state.Name.ValueString(),
 	}
 
-	tflog.Debug(ctx, "DatabaseRoleResource: create the role")
-	err = r.connector.DeleteDatabaseRole(dbCtx, db, role)
-
+	err = connector.DeleteDatabaseRole(ctx, db, role)
 	if err != nil {
 		resp.Diagnostics.AddError("Error deleting role", err.Error())
 		return
 	}
+
+	logResourceOperationComplete(ctx, "DatabaseRoleResource", "Delete")
 }
 
 // Read reads the state of the DatabaseRoleResource.
@@ -225,30 +194,21 @@ func (r *DatabaseRoleResource) Delete(ctx context.Context, req resource.DeleteRe
 // It returns any diagnostics encountered during the process.
 func (r *DatabaseRoleResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	var state model.RoleModel
-	var err error
-	var diags diag.Diagnostics
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "DatabaseRoleResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
+	logResourceOperation(ctx, "DatabaseRoleResource", "Read")
 
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
+	// Use provider connector
+	connector := r.connector
 
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "DatabaseRoleResource: connect to the database")
-	db, err := r.connector.Connect()
-
+	// Connect to database using helper function
+	db, err := connectToDatabase(ctx, connector)
 	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
 		return
 	}
 
@@ -256,140 +216,21 @@ func (r *DatabaseRoleResource) Read(ctx context.Context, req resource.ReadReques
 		Name: state.Name.ValueString(),
 	}
 
-	tflog.Debug(ctx, "DatabaseRoleResource: get the role")
-	role, err = r.connector.GetDatabaseRole(dbCtx, db, role)
+	role, err = connector.GetDatabaseRole(ctx, db, role)
 
-	if err != nil && err.Error() != "database role not found" {
-		resp.Diagnostics.AddError("Error getting role", err.Error())
+	// Use the centralized error handling logic
+	errorResult := HandleDatabaseRoleReadError(err)
+	if errorResult.ShouldRemoveFromState {
+		tflog.Debug(ctx, "Database role not found in database, removing from state")
+		resp.State.RemoveResource(ctx)
 		return
 	}
 
-	tflog.Debug(ctx, "userDataSource: populate the state object (model.UserModel) ")
-
-	if role == nil {
-		state = model.RoleModel{
-			Config: state.Config,
-		}
-	} else {
-		state.Name = types.StringValue(role.Name)
-		state.PrincipalID = types.Int64Value(role.PrincipalID)
-		state.Type = types.StringValue(role.Type)
-		state.TypeDescription = types.StringValue(role.TypeDescription)
-		state.OwningPrincipal = types.StringValue(role.OwningPrincipal)
-		state.IsFixedRole = types.BoolValue(role.IsFixedRole)
-	}
-
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-}
-
-// Update updates the database role based on the provided update request.
-// Update only the members of the role.
-// It compares the members in the plan with the members in the database and adds or removes members accordingly.
-// It also populates the state object with the updated role information.
-
-func (r *DatabaseRoleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var state model.RoleModel
-	var err error
-	var diags diag.Diagnostics
-
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
-
-	if resp.Diagnostics.HasError() {
+	if errorResult.ShouldAddError {
+		resp.Diagnostics.AddError(errorResult.ErrorMessage, err.Error())
 		return
 	}
 
-	tflog.Debug(ctx, "DatabaseRoleResource: getConnector")
-	r.connector, diags = getConnector(state.Config)
-
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
-
-	// Set up the context and connect to the database.
-	dbCtx := context.Background()
-	tflog.Debug(ctx, "DatabaseRoleResource: connect to the database")
-	db, err := r.connector.Connect()
-
-	if err != nil {
-		resp.Diagnostics.AddError("Error connecting to the database", err.Error())
-		return
-	}
-
-	role := &qmodel.Role{
-		Name: state.Name.ValueString(),
-	}
-
-	tflog.Debug(ctx, "DatabaseRoleResource: get the role")
-	role, err = r.connector.GetDatabaseRole(dbCtx, db, role)
-	if err != nil && err.Error() != "database role not found" {
-		resp.Diagnostics.AddError("Error getting role", err.Error())
-		return
-	}
-
-	tflog.Debug(ctx, "DatabaseRoleResource: get the role members")
-	membersInDB, err := r.connector.GetDatabaseRoleMembers(dbCtx, db, role)
-	if err != nil {
-		resp.Diagnostics.AddError("Error getting role members", err.Error())
-		return
-	}
-
-	var usersToAdd = make([]*qmodel.User, 0)
-	var usersToRemove = make([]*qmodel.User, 0)
-
-	// Compare the members in the plan with the members in the database.
-	// If the member is in the plan but not in the database, add it.
-	for _, memberInPlan := range state.Members {
-		found := false
-		for _, memberInDB := range membersInDB {
-			if memberInPlan.ValueString() == memberInDB.Name {
-				found = true
-			}
-		}
-		if !found {
-			user := &qmodel.User{
-				Name: memberInPlan.ValueString(),
-			}
-			usersToAdd = append(usersToAdd, user)
-		}
-	}
-
-	// Compare the members in the database with the members in the plan.
-	// If the member is in the database but not in the plan, remove it.
-	for _, memberInDB := range membersInDB {
-		found := false
-		for _, memberInPlan := range state.Members {
-			if memberInPlan.ValueString() == memberInDB.Name {
-				found = true
-			}
-		}
-		if !found {
-			user := &qmodel.User{
-				Name: memberInDB.Name,
-			}
-			usersToRemove = append(usersToRemove, user)
-		}
-	}
-
-	// Add the members to the role
-	err = r.connector.AddDatabaseRoleMembers(dbCtx, db, role, usersToAdd)
-	if err != nil {
-		resp.Diagnostics.AddError("Error adding users to role", err.Error())
-		return
-	}
-
-	// Remove the members from the role
-	err = r.connector.RemoveDatabaseRoleMembers(dbCtx, db, role, usersToRemove)
-	if err != nil {
-		resp.Diagnostics.AddError("Error removing users from role", err.Error())
-		return
-	}
-
-	tflog.Debug(ctx, "userDataSource: populate the state object (model.UserModel) ")
 	state.Name = types.StringValue(role.Name)
 	state.PrincipalID = types.Int64Value(role.PrincipalID)
 	state.Type = types.StringValue(role.Type)
@@ -397,12 +238,51 @@ func (r *DatabaseRoleResource) Update(ctx context.Context, req resource.UpdateRe
 	state.OwningPrincipal = types.StringValue(role.OwningPrincipal)
 	state.IsFixedRole = types.BoolValue(role.IsFixedRole)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	logResourceOperationComplete(ctx, "DatabaseRoleResource", "Read")
+}
+
+// Update updates the database role based on the provided update request.
+// Since the name requires replacement, there are no updateable fields for this resource.
+func (r *DatabaseRoleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var state model.RoleModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	logResourceOperation(ctx, "DatabaseRoleResource", "Update")
+
+	// Use provider connector
+	connector := r.connector
+
+	// Connect to database using helper function
+	db, err := connectToDatabase(ctx, connector)
+	if err != nil {
+		handleDatabaseConnectionError(ctx, err, &resp.Diagnostics)
+		return
+	}
+
+	role := &qmodel.Role{
+		Name: state.Name.ValueString(),
+	}
+
+	role, err = connector.GetDatabaseRole(ctx, db, role)
+	if err != nil {
+		resp.Diagnostics.AddError("Error getting role", err.Error())
+		return
+	}
+
+	state.Name = types.StringValue(role.Name)
+	state.PrincipalID = types.Int64Value(role.PrincipalID)
+	state.Type = types.StringValue(role.Type)
+	state.TypeDescription = types.StringValue(role.TypeDescription)
+	state.OwningPrincipal = types.StringValue(role.OwningPrincipal)
+	state.IsFixedRole = types.BoolValue(role.IsFixedRole)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	logResourceOperationComplete(ctx, "DatabaseRoleResource", "Update")
 }
 
 // ImportState implements resource.ResourceWithImportState.

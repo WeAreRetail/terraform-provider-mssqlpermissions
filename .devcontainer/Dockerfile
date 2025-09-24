@@ -1,10 +1,10 @@
 # Inspiration: https://github.com/devcontainers/templates/blob/main/src/go-postgres/.devcontainer/Dockerfile
-ARG GO_VARIANT=1.24-bookworm
-FROM mcr.microsoft.com/devcontainers/go:1-${GO_VARIANT}
+ARG GO_TAG=1.24-bookworm
+FROM mcr.microsoft.com/devcontainers/go:${GO_TAG}
 
 ARG REMOTE_USER=vscode
-ARG DELVE_VERSION=1.25.0
-ARG GOLANGCI_LINT_VERSION=v2.2.2
+ARG DELVE_VERSION=1.25.1
+ARG GOLANGCI_LINT_VERSION=v2.5.0
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -50,7 +50,7 @@ RUN \
     # --> Staticcheck
     && go install honnef.co/go/tools/cmd/staticcheck@latest \
     # --> GoReleaser
-    && go install github.com/goreleaser/goreleaser@latest \
+    && go install github.com/goreleaser/goreleaser/v2@v2.11.2 \
     # --> shfmt
     && go install mvdan.cc/sh/v3/cmd/shfmt@latest \
     # --> go-mod-outdated for dependency management

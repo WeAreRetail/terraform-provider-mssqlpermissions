@@ -8,13 +8,13 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 var (
-	_ datasource.DataSource = &databaseRoleDataSource{}
+	_ datasource.DataSource              = &databaseRoleDataSource{}
+	_ datasource.DataSourceWithConfigure = &databaseRoleDataSource{}
 )
 
 func NewDatabaseRoleDataSource() datasource.DataSource {
@@ -25,30 +25,20 @@ type databaseRoleDataSource struct {
 	connector *queries.Connector
 }
 
-// Metadata is a method that sets the metadata for the user data source.
-// It takes a context.Context, a datasource.MetadataRequest, and a pointer to a datasource.MetadataResponse as parameters.
-// It sets the TypeName field of the response to the concatenation of the ProviderTypeName from the request and "_database_role".
-// The TypeName is used by the documentation generator and the language server.
-// It returns nothing.
+// Metadata sets the metadata for the database role data source.
+// It sets the TypeName to include the provider type name and "_database_role".
 func (d *databaseRoleDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_database_role"
 }
 
-// Schema is a method that sets the schema for the user data source.
-// It takes a context.Context, a datasource.SchemaRequest, and a pointer to a datasource.SchemaResponse as parameters.
-// It sets the Schema field of the response to a schema.Schema.
-// The schema.Schema is a map of strings to schema.Attribute.
-// The schema.Attribute is a struct that contains the description, markdown description, and other information about the attribute.
-// The schema.Schema is used by the documentation generator and the language server.
-// It returns nothing.
+// Schema defines the schema for the database role data source.
+// It specifies the available attributes that can be configured or computed.
 func (d *databaseRoleDataSource) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		MarkdownDescription: "Database role data source.",
 
 		Attributes: map[string]schema.Attribute{
-			"config": getConfigSchema(), // config is the configuration block shared by all resources and data sources.
-
 			"name": schema.StringAttribute{
 				Description:         "The database role's name.",
 				MarkdownDescription: "The database role's name.",
@@ -90,28 +80,39 @@ func (d *databaseRoleDataSource) Schema(_ context.Context, req datasource.Schema
 	}
 }
 
-// Read is a method that reads the database role data source.
-// It takes a context.Context, a datasource.ReadRequest, and a pointer to a datasource.ReadResponse as parameters.
-// It sets the State field of the response to a schema.Schema.
+// Configure is called by the framework to pass provider-level configuration to the data source.
+func (d *databaseRoleDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	// Prevent panic if provider has not been configured.
+	if req.ProviderData == nil {
+		return
+	}
+
+	connector, ok := req.ProviderData.(*queries.Connector)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected DataSource Configure Type",
+			"Expected *queries.Connector, got something else. Please report this issue to the provider developers.",
+		)
+		return
+	}
+
+	d.connector = connector
+}
+
+// Read is a method of the databaseRoleDataSource struct that reads the state of the data source.
+// It retrieves the role information from the database and populates the state object.
+// If the role is not found, it creates an empty state object.
+// It returns any diagnostics encountered during the process.
 func (d *databaseRoleDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var state model.RoleDataSourceModel
 
-	var state model.RoleModel
-	var err error
-	var diags diag.Diagnostics
-
-	resp.Diagnostics.Append(req.Config.Get(ctx, &state)...)
-
+	diags := req.Config.Get(ctx, &state)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	tflog.Debug(ctx, "databaseRoleDataSource: getConnector")
-	d.connector, diags = getConnector(state.Config)
-
-	if diags.HasError() {
-		resp.Diagnostics.Append(diags...)
-		return
-	}
+	tflog.Debug(ctx, "databaseRoleDataSource: using provider connector")
 
 	// Set up the context and connect to the database.
 	dbCtx := context.Background()

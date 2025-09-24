@@ -1,12 +1,4 @@
 {
-  "cSpell.words": [
-    "azuretools",
-    "goreleaser",
-    "mssql",
-    "providerserver",
-    "tfplugindocs",
-    "weareretail"
-  ],
   "[dockercompose]": {
     "editor.insertSpaces": true,
     "editor.tabSize": 2,

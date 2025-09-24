@@ -10,7 +10,7 @@ port=${5:-1433}
 echo "SELECT * FROM SYS.DATABASES" | dd of=testsqlconnection.sql
 # shellcheck disable=SC2034
 for i in {1..60}; do
-  /opt/mssql-tools18/bin/sqlcmd -S "$host","$port" -U sa -P "$SApassword" -d master -C -i testsqlconnection.sql >/dev/null
+  /opt/mssql-tools/bin/sqlcmd -S "$host","$port" -U sa -P "$SApassword" -d master -C -i testsqlconnection.sql >/dev/null
   # shellcheck disable=SC2181
   if [ $? -eq 0 ]; then
     echo "SQL server ready"
@@ -40,7 +40,7 @@ if [ $sqlfiles == "true" ]; then
   for f in "$sqlpath"/*; do
     if [[ $f == "$sqlpath"/*".sql" ]]; then
       echo "Executing $f"
-      /opt/mssql-tools1818/bin/sqlcmd -S "$host","$port" -U sa -P "$SApassword" -d master -C -i "$f"
+      /opt/mssql-tools/bin/sqlcmd -S "$host","$port" -U sa -P "$SApassword" -d master -C -i "$f"
     fi
   done
 fi

@@ -32,24 +32,31 @@ func TestAccUserResource(t *testing.T) {
 				),
 			},
 			// Delete testing automatically occurs in TestCase
+
+			// TODO: Add external deletion test scenario:
+			// 1. Create resource with Terraform
+			// 2. Use a custom test step that manually deletes the resource from the database
+			// 3. Plan should show resource will be recreated (not deleted)
+			// 4. Apply should succeed without "cannot delete... does not exist" errors
+			// This would catch the bug we just fixed where external deletion wasn't handled properly.
 		},
 	})
 }
 
 func testAccUserResourceConfig(name string, password string) string {
 	return fmt.Sprintf(`
-resource "mssqlpermissions_user" "test" {
-	config = {
-		server_fqdn   = %q
-		server_port   = %q
-		database_name = "ApplicationDB"
+provider "mssqlpermissions" {
+	server_fqdn   = %q
+	server_port   = %q
+	database_name = "ApplicationDB"
 
-		sql_login = {
-		  username = "sa"
-		  password = "P@ssw0rd"
-		}
+	sql_login = {
+		username = "sa"
+		password = "P@ssw0rd"
 	}
+}
 
+resource "mssqlpermissions_user" "test" {
 	name     = %q
 	password = %q
 }

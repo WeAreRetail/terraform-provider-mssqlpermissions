@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"log"
 	"net/url"
 	"strings"
 	"time"
@@ -14,9 +13,6 @@ import (
 	mssql "github.com/microsoft/go-mssqldb"
 	azuread "github.com/microsoft/go-mssqldb/azuread"
 )
-
-// The database connection.
-var db *sql.DB
 
 type FedAuth string
 
@@ -40,7 +36,10 @@ const (
 	ActiveDirectoryAzCli            FedAuth = "ActiveDirectoryAzCli"
 )
 
-// Connector represents a connection to a SQL Server, optionally with a database.
+// Connector holds the configuration and authentication details required to connect to a SQL Server instance.
+// It supports multiple authentication methods including local user login, Azure application login, and managed identity login.
+// The struct also includes metadata about the target database, such as whether it is an Azure or contained database,
+// as well as connection parameters like host, port, database name, timeout, and default language.
 type Connector struct {
 	Host                  string
 	Port                  int
@@ -50,7 +49,6 @@ type Connector struct {
 	AzureApplicationLogin *AzureApplicationLogin
 	ManagedIdentityLogin  *ManagedIdentityLogin
 	isAzureDatabase       bool
-	isContainedDatabase   bool
 	defaultLanguage       string
 }
 
@@ -80,7 +78,7 @@ type LocalUserLogin struct {
 func (c *Connector) connector() (driver.Connector, error) {
 	// Validate the Connector fields before creating the driver.Connector
 	if err := c.validate(); err != nil {
-		return nil, fmt.Errorf("validation error: %v", err)
+		return nil, fmt.Errorf("validation error: %w", err)
 	}
 
 	connectionString := &url.URL{
@@ -174,7 +172,7 @@ func (c *Connector) getVersion(ctx context.Context, db *sql.DB) (string, error) 
 
 	row := db.QueryRowContext(ctx, query)
 	if err = row.Err(); err != nil {
-		log.Fatal(fmt.Errorf("cannot retrieve version: %v", err))
+		return "", fmt.Errorf("cannot retrieve version: %w", err)
 	}
 
 	err = row.Scan(&version)
@@ -202,7 +200,7 @@ func (c *Connector) getDefaultLanguage(ctx context.Context, db *sql.DB) (string,
 
 	row := db.QueryRowContext(ctx, query)
 	if err = row.Err(); err != nil {
-		log.Fatal(fmt.Errorf("cannot retrieve version: %v", err))
+		return "", fmt.Errorf("cannot retrieve default language: %w", err)
 	}
 
 	err = row.Scan(&defaultLanguage)
@@ -210,7 +208,7 @@ func (c *Connector) getDefaultLanguage(ctx context.Context, db *sql.DB) (string,
 	return defaultLanguage, err
 }
 
-// getContainedStatus retrieves the default language of the connected SQL Server.
+// getContainedStatus confirms if the connected database is a contained database.
 func (c *Connector) containedEnabled(ctx context.Context, db *sql.DB) (bool, error) {
 	var containedEnabled bool
 	var err error
@@ -230,7 +228,7 @@ func (c *Connector) containedEnabled(ctx context.Context, db *sql.DB) (bool, err
 
 	row := db.QueryRowContext(ctx, query)
 	if err = row.Err(); err != nil {
-		log.Fatal(fmt.Errorf("cannot retrieve version: %v", err))
+		return false, fmt.Errorf("cannot retrieve contained database status: %w", err)
 	}
 
 	err = row.Scan(&containedEnabled)
@@ -238,7 +236,9 @@ func (c *Connector) containedEnabled(ctx context.Context, db *sql.DB) (bool, err
 	return containedEnabled, err
 }
 
-// Connect establishes a connection to the SQL Server.
+// Connect establishes a connection to the SQL Server using the configured authentication method.
+// It validates the connection, retrieves server metadata, and ensures database compatibility.
+// Returns a *sql.DB connection and an error if the connection fails or database is incompatible.
 func (c *Connector) Connect() (*sql.DB, error) {
 	if c == nil {
 		return nil, errors.New("no connector provided")
@@ -251,10 +251,10 @@ func (c *Connector) Connect() (*sql.DB, error) {
 
 	driverConnector, err := c.connector()
 	if err != nil {
-		return nil, fmt.Errorf("error creating driver connector: %v", err)
+		return nil, fmt.Errorf("error creating driver connector: %w", err)
 	}
 
-	db = sql.OpenDB(driverConnector)
+	db := sql.OpenDB(driverConnector)
 
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout)
 	defer cancel()
@@ -291,8 +291,45 @@ func (c *Connector) Connect() (*sql.DB, error) {
 		return nil, fmt.Errorf("error retrieving the contained status: %s", err)
 	}
 
-	// Azure SQL Database are always contained database even if the setting is not present
-	c.isContainedDatabase = isContainedDatabase || c.isAzureDatabase
+	// This provider only supports contained databases. Return an error if the database is not contained.
+	if !isContainedDatabase && !c.isAzureDatabase {
+		return nil, fmt.Errorf("the target database is not a contained database. This provider only supports contained databases")
+	}
 
 	return db, nil
+}
+
+// validateDatabaseConnection validates that the database connection is not nil and is alive.
+// This is a common validation pattern used across all database operations.
+func (c *Connector) validateDatabaseConnection(ctx context.Context, db *sql.DB) error {
+	if db == nil {
+		return errors.New("database connection is nil")
+	}
+	if err := db.PingContext(ctx); err != nil {
+		return fmt.Errorf("database ping failed: %w", err)
+	}
+	return nil
+}
+
+// validateDatabaseConnectionWithRetry validates database connection with retry logic.
+// This should be used for query operations that might benefit from retrying on transient failures.
+func (c *Connector) validateDatabaseConnectionWithRetry(ctx context.Context, db *sql.DB, maxRetries int) error {
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+
+	for i := 0; i < maxRetries; i++ {
+		if err := c.validateDatabaseConnection(ctx, db); err == nil {
+			return nil
+		}
+		if i < maxRetries-1 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(time.Millisecond * 100 * time.Duration(i+1)):
+				// Continue to next retry
+			}
+		}
+	}
+	return c.validateDatabaseConnection(ctx, db) // Return the final error
 }

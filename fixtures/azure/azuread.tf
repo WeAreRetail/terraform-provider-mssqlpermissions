@@ -31,7 +31,7 @@ resource "azuread_application_password" "sql_admin" {
 
 resource "azuread_directory_role_assignment" "spn_directory_reader" {
   role_id             = azuread_directory_role.directory_reader.template_id
-  principal_object_id = azuread_service_principal.sql_admin.id
+  principal_object_id = azuread_service_principal.sql_admin.object_id
 }
 
 resource "azuread_directory_role_assignment" "server_directory_reader" {

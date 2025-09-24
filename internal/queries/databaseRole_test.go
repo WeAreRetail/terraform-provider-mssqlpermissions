@@ -1,3 +1,5 @@
+//go:build integration
+
 package queries
 
 import (
@@ -217,9 +219,8 @@ func TestConnector_AddDatabaseRoleMember(t *testing.T) {
 				Name: generateRandomString(10),
 			},
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			wantErr: false,
 		},
@@ -230,9 +231,8 @@ func TestConnector_AddDatabaseRoleMember(t *testing.T) {
 				Name: generateRandomString(10),
 			},
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			wantErr: false,
 		},
@@ -314,9 +314,8 @@ func TestConnector_RemoveDatabaseRoleMember(t *testing.T) {
 				Name: generateRandomString(10),
 			},
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			wantErr: false,
 		},
@@ -327,9 +326,8 @@ func TestConnector_RemoveDatabaseRoleMember(t *testing.T) {
 				Name: generateRandomString(10),
 			},
 			user: &model.User{
-				Name:      generateRandomString(10),
-				Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-				Contained: true,
+				Name:     generateRandomString(10),
+				Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 			},
 			wantErr: false,
 		},
@@ -421,19 +419,16 @@ func TestConnector_GetDatabaseRoleMembers(t *testing.T) {
 			},
 			users: []*model.User{
 				{
-					Name:      generateRandomString(10),
-					Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-					Contained: true,
+					Name:     generateRandomString(10),
+					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 				},
 				{
-					Name:      generateRandomString(10),
-					Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-					Contained: true,
+					Name:     generateRandomString(10),
+					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 				},
 				{
-					Name:      generateRandomString(10),
-					Password:  fmt.Sprintf("%s1aA!", generateRandomString(16)),
-					Contained: true,
+					Name:     generateRandomString(10),
+					Password: fmt.Sprintf("%s1aA!", generateRandomString(16)),
 				},
 			},
 			wantErr: false,

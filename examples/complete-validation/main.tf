@@ -1,0 +1,81 @@
+terraform {
+  required_version = ">= 1.0"
+
+  required_providers {
+    mssqlpermissions = {
+      source  = "WeAreRetail/mssqlpermissions"
+      version = ">= 0.0.5"
+    }
+  }
+}
+
+# Provider configuration - this will use environment variables
+provider "mssqlpermissions" {
+  server_fqdn   = var.server_fqdn
+  server_port   = var.server_port
+  database_name = var.database_name
+
+  # Use SQL authentication for local testing
+  sql_login = var.use_sql_auth ? {
+    username = var.sql_username
+    password = var.sql_password
+  } : null
+
+  # Use Azure AD authentication for cloud testing (Service Principal)
+  spn_login = var.use_azure_auth ? {
+    tenant_id     = var.azure_tenant_id
+    client_id     = var.azure_client_id
+    client_secret = var.azure_client_secret
+  } : null
+}
+
+# Create test users
+resource "mssqlpermissions_user" "test_user_1" {
+  name     = "test_user_validation_1"
+  external = var.use_azure_auth
+  password = var.use_azure_auth ? null : var.test_user_password
+}
+
+resource "mssqlpermissions_user" "test_user_2" {
+  name     = "test_user_validation_2"
+  external = var.use_azure_auth
+  password = var.use_azure_auth ? null : var.test_user_password
+}
+
+# Create test database role
+resource "mssqlpermissions_database_role" "test_role" {
+  name = "test_role_validation"
+}
+
+# Create role members management
+resource "mssqlpermissions_database_role_members" "test_role_members" {
+  name = mssqlpermissions_database_role.test_role.name
+  members = [
+    mssqlpermissions_user.test_user_1.name,
+    mssqlpermissions_user.test_user_2.name
+  ]
+}
+
+# Grant permissions to role
+resource "mssqlpermissions_permissions_to_role" "test_permissions" {
+  role_name = mssqlpermissions_database_role.test_role.name
+  permissions = [
+    {
+      permission_name = "SELECT"
+    },
+    {
+      permission_name = "CONNECT"
+    }
+  ]
+}
+
+# Data sources for validation
+data "mssqlpermissions_user" "test_user_1_data" {
+  name       = mssqlpermissions_user.test_user_1.name
+  depends_on = [mssqlpermissions_user.test_user_1]
+}
+
+data "mssqlpermissions_database_role" "test_role_data" {
+  name       = mssqlpermissions_database_role.test_role.name
+  depends_on = [mssqlpermissions_database_role.test_role]
+}

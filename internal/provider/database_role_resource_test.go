@@ -18,7 +18,7 @@ func TestAccDatabaseRoleResourceLocal(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccDatabaseRoleResourceConfigLocalSQL("one", "\"userFixtureOne\",\"userFixtureTwo\""),
+				Config: testAccDatabaseRoleResourceConfigLocalSQL("one"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("mssqlpermissions_database_role.test", "name", "one"),
 					resource.TestCheckResourceAttr("mssqlpermissions_database_role.test", "owning_principal", "1"),
@@ -26,14 +26,14 @@ func TestAccDatabaseRoleResourceLocal(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: testAccDatabaseRoleResourceConfigLocalSQL("two", "\"userFixtureOne\",\"userFixtureTwo\""),
+				Config: testAccDatabaseRoleResourceConfigLocalSQL("two"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("mssqlpermissions_database_role.test", "name", "two"),
 				),
 			},
 			// Update and Read testing
 			{
-				Config: testAccDatabaseRoleResourceConfigLocalSQL("two", "\"userFixtureTwo\""),
+				Config: testAccDatabaseRoleResourceConfigLocalSQL("two"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("mssqlpermissions_database_role.test", "name", "two"),
 				),
@@ -43,24 +43,23 @@ func TestAccDatabaseRoleResourceLocal(t *testing.T) {
 	})
 }
 
-func testAccDatabaseRoleResourceConfigLocalSQL(name string, member string) string {
+func testAccDatabaseRoleResourceConfigLocalSQL(name string) string {
 	return fmt.Sprintf(`
-resource "mssqlpermissions_database_role" "test" {
-	config = {
-		server_fqdn   = %q
-		server_port   = %q
-		database_name = "ApplicationDB"
+provider "mssqlpermissions" {
+	server_fqdn   = %q
+	server_port   = %q
+	database_name = "ApplicationDB"
 
-		sql_login = {
-		  username = "sa"
-		  password = "P@ssw0rd"
-		}
-	  }
-
-	name     = %q
-	members  = [%s]
+	sql_login = {
+		username = "sa"
+		password = "P@ssw0rd"
+	}
 }
-`, os.Getenv("LOCAL_SQL_HOST"), os.Getenv("LOCAL_SQL_PORT"), name, member)
+
+resource "mssqlpermissions_database_role" "test" {
+	name     = %q
+}
+`, os.Getenv("LOCAL_SQL_HOST"), os.Getenv("LOCAL_SQL_PORT"), name)
 }
 
 func TestAccDatabaseRoleResourceAzure(t *testing.T) {
@@ -73,7 +72,7 @@ func TestAccDatabaseRoleResourceAzure(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: testAccDatabaseRoleResourceConfigAzureSQL("one", "\"userFixtureOne\",\"fixtureTwo\""),
+				Config: testAccDatabaseRoleResourceConfigAzureSQL("one"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("mssqlpermissions_database_role.test", "name", "one"),
 					resource.TestCheckResourceAttr("mssqlpermissions_database_role.test", "owning_principal", "1"),
@@ -81,14 +80,14 @@ func TestAccDatabaseRoleResourceAzure(t *testing.T) {
 			},
 			// Update and Read testing
 			{
-				Config: testAccDatabaseRoleResourceConfigAzureSQL("two", "\"userFixtureOne\",\"fixtureTwo\""),
+				Config: testAccDatabaseRoleResourceConfigAzureSQL("two"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("mssqlpermissions_database_role.test", "name", "two"),
 				),
 			},
 			// Update and Read testing
 			{
-				Config: testAccDatabaseRoleResourceConfigAzureSQL("two", "\"userFixtureTwo\""),
+				Config: testAccDatabaseRoleResourceConfigAzureSQL("two"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("mssqlpermissions_database_role.test", "name", "two"),
 				),
@@ -98,17 +97,21 @@ func TestAccDatabaseRoleResourceAzure(t *testing.T) {
 	})
 }
 
-func testAccDatabaseRoleResourceConfigAzureSQL(name string, member string) string {
+func testAccDatabaseRoleResourceConfigAzureSQL(name string) string {
 	return fmt.Sprintf(`
-resource "mssqlpermissions_database_role" "test" {
-	config = {
-		server_fqdn   = "d10abc76c9sqlfind.database.windows.net"
-		server_port   = 1433
-		database_name = "ApplicationDB"
-	  }
+provider "mssqlpermissions" {
+	server_fqdn   = %q
+	server_port   = %q
+	database_name = "ApplicationDB"
 
-	name     = %q
-	members  = [%s]
+	sql_login = {
+		username = %q
+		password = %q
+	}
 }
-`, name, member)
+
+resource "mssqlpermissions_database_role" "test" {
+	name     = %q
+}
+`, os.Getenv("AZURE_MSSQL_SERVER"), os.Getenv("MSSQL_PORT"), os.Getenv("AZURE_MSSQL_USERNAME"), os.Getenv("AZURE_MSSQL_PASSWORD"), name)
 }

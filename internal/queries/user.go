@@ -18,28 +18,8 @@ func (c *Connector) validateUser(user *model.User) error {
 		return errors.New("a user must have a name")
 	}
 
-	if user.Contained {
-		if user.LoginName != "" {
-			return errors.New("a contained user cannot have a login name")
-		}
-		if user.Password == "" && !user.External {
-			return errors.New("a contained user must have a password if it's not external")
-		}
-	}
-
-	if !user.Contained {
-		if user.LoginName == "" && !user.External {
-			return errors.New("a not contained and not external user must have a login")
-		}
-
-		if user.External && (user.LoginName != "" || user.Password != "") {
-			return errors.New("a not contained external user cannot have a password or a login")
-		}
-
-		if user.DefaultLanguage != "" {
-			return errors.New("a not contained user cannot have a default language")
-
-		}
+	if user.Password == "" && !user.External {
+		return errors.New("a contained user must have a password if it's not external")
 	}
 
 	if user.External {
@@ -64,8 +44,8 @@ func (c *Connector) validateUser(user *model.User) error {
 }
 
 // CreateUser creates a user on the specified database.
-// It returns a user object with the login name populated.
-// If any error occurs, it returns an error object with the reason.
+// It takes a context, a database connection, and a user model as input.
+// It returns an error if the user creation fails, or nil if successful.
 func (c *Connector) CreateUser(ctx context.Context, db *sql.DB, user *model.User) error {
 
 	var err error
@@ -73,31 +53,20 @@ func (c *Connector) CreateUser(ctx context.Context, db *sql.DB, user *model.User
 	// Validate the user object.
 	err = c.validateUser(user)
 	if err != nil {
-		return fmt.Errorf("cannot create user. validation failed : %v", err)
+		return fmt.Errorf("cannot create user. validation failed : %w", err)
 	}
 
+	// Create a copy of the user to avoid mutating the input parameter
+	userCopy := *user
+
 	// Set the default schema to dbo if it's not specified.
-	if user.DefaultSchema == "" {
-		user.DefaultSchema = "dbo"
+	if userCopy.DefaultSchema == "" {
+		userCopy.DefaultSchema = "dbo"
 	}
 
 	// Check if the database connection is nil.
-	if db == nil {
-		return errors.New("database connection is nil")
-	}
-
-	// Check if the database is alive by pinging it.
-	err = db.PingContext(ctx)
-	if err != nil {
-		return fmt.Errorf("database ping failed: %v", err)
-	}
-
-	// If a login name is specified, check if the login exists.
-	if user.LoginName != "" {
-		_, err = c.GetLogin(ctx, db, &model.Login{Name: user.LoginName})
-		if err != nil {
-			return fmt.Errorf("issue with the provided login: %v", err)
-		}
+	if err := c.validateDatabaseConnection(ctx, db); err != nil {
+		return err
 	}
 
 	// SQL query to create a user
@@ -105,37 +74,25 @@ func (c *Connector) CreateUser(ctx context.Context, db *sql.DB, user *model.User
 	query := "'CREATE USER ' + QUOTENAME(@name)"
 
 	// The authentication type is Azure Active Directory.
-	if user.External {
-		if c.isAzureDatabase || user.Contained { // The database is an Azure Database or the user is contained.
-			query = query + " + ' FROM EXTERNAL PROVIDER'"
+	if userCopy.External {
+		query = query + " + ' FROM EXTERNAL PROVIDER'"
 
-			if c.isAzureDatabase && user.ObjectID != "" {
-				// Link to a SPN in Azure Active Directory.
-				// Note: this is an undocumented, unsupported option. See https://github.com/MicrosoftDocs/sql-docs/issues/2323
-				query = query + " + ' WITH OBJECT_ID= ' + QuoteName(@objectID)"
-			}
-
-		} else { // The database is not an Azure Database and the user is not contained.
-			query = query + " + ' FOR LOGIN ' + QuoteName(@loginName) + ' FROM EXTERNAL PROVIDER WITH DEFAULT_SCHEMA = ' + QuoteName(@defaultSchema)"
+		if c.isAzureDatabase && userCopy.ObjectID != "" {
+			// Link to a SPN in Azure Active Directory.
+			// Note: this is an undocumented, unsupported option. See https://github.com/MicrosoftDocs/sql-docs/issues/2323
+			query = query + " + ' WITH OBJECT_ID= ' + QuoteName(@objectID)"
 		}
 	} else { // The authentication type is SQL Server authentication.
-		if user.Contained {
-			if !c.isContainedDatabase {
-				return errors.New("cannot create a user with a password in a non-contained database")
-			}
-			query = query + " + ' WITH PASSWORD = ' + QUOTENAME(@password, '''') + ', DEFAULT_SCHEMA = ' + QuoteName(@defaultSchema)"
 
-			if !c.isAzureDatabase {
-				// Set the default language to NONE if it's not specified.
-				if user.DefaultLanguage == "" {
-					query = query + " + ', DEFAULT_LANGUAGE = NONE'"
-				} else {
-					query = query + " + ', DEFAULT_LANGUAGE = ' + QuoteName(@defaultLanguage)"
-				}
-			}
+		query = query + " + ' WITH PASSWORD = ' + QUOTENAME(@password, '''') + ', DEFAULT_SCHEMA = ' + QuoteName(@defaultSchema)"
 
-		} else { // The user is not contained.
-			query = query + " + ' FOR LOGIN ' + QuoteName(@loginName) + ' WITH DEFAULT_SCHEMA = ' + QuoteName(@defaultSchema)"
+		if !c.isAzureDatabase {
+			// Set the default language to NONE if it's not specified.
+			if userCopy.DefaultLanguage == "" {
+				query = query + " + ', DEFAULT_LANGUAGE = NONE'"
+			} else {
+				query = query + " + ', DEFAULT_LANGUAGE = ' + QuoteName(@defaultLanguage)"
+			}
 		}
 	}
 
@@ -145,15 +102,14 @@ func (c *Connector) CreateUser(ctx context.Context, db *sql.DB, user *model.User
 	_, err = db.ExecContext(
 		ctx,
 		tsql,
-		sql.Named("name", user.Name),
-		sql.Named("password", user.Password),
-		sql.Named("loginName", user.LoginName),
-		sql.Named("objectID", user.ObjectID),
-		sql.Named("defaultSchema", user.DefaultSchema),
-		sql.Named("defaultLanguage", user.DefaultLanguage))
+		sql.Named("name", userCopy.Name),
+		sql.Named("password", userCopy.Password),
+		sql.Named("objectID", userCopy.ObjectID),
+		sql.Named("defaultSchema", userCopy.DefaultSchema),
+		sql.Named("defaultLanguage", userCopy.DefaultLanguage))
 
 	if err != nil {
-		return fmt.Errorf("cannot create user. Underlying sql error : %v", err)
+		return fmt.Errorf("cannot create user. Underlying sql error : %w", err)
 	}
 
 	return nil
@@ -180,14 +136,8 @@ func (c *Connector) GetUser(ctx context.Context, db *sql.DB, user *model.User) (
 	var result DatabasePrincipals
 
 	// Check if the database connection is nil.
-	if db == nil {
-		return nil, errors.New("database connection is nil")
-	}
-
-	// Check if the database is alive by pinging it.
-	err = db.PingContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("database ping failed: %v", err)
+	if err := c.validateDatabaseConnection(ctx, db); err != nil {
+		return nil, err
 	}
 
 	// SQL query to retrieve a user
@@ -219,7 +169,7 @@ func (c *Connector) GetUser(ctx context.Context, db *sql.DB, user *model.User) (
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot retrieve user: %v", err)
+		return nil, fmt.Errorf("cannot retrieve user: %w", err)
 	}
 
 	// Populate the user object with the result.
@@ -228,11 +178,6 @@ func (c *Connector) GetUser(ctx context.Context, db *sql.DB, user *model.User) (
 		user.External = true
 	} else {
 		user.External = false
-	}
-	if result.AuthenticationTypeDesc == "DATABASE" {
-		user.Contained = true
-	} else {
-		user.Contained = false
 	}
 	user.DefaultSchema = result.DefaultSchemaName.String
 	user.DefaultLanguage = result.DefaultLanguageName.String
@@ -243,14 +188,15 @@ func (c *Connector) GetUser(ctx context.Context, db *sql.DB, user *model.User) (
 }
 
 // UpdateUser updates a user on the specified database.
-// If any error occurs, it returns an error object with the reason.
+// It takes a context, a database connection, and a user model as input.
+// It returns an error if the user update fails, or nil if successful.
 func (c *Connector) UpdateUser(ctx context.Context, db *sql.DB, user *model.User) error {
 	var err error
 
 	// Get the original user
 	originalUser, err := c.GetUser(ctx, db, user)
 	if err != nil {
-		return fmt.Errorf("cannot retrieve the user to update. Underlying sql error : %v", err)
+		return fmt.Errorf("cannot retrieve the user to update. Underlying sql error : %w", err)
 	}
 
 	// if originalUser.External {
@@ -258,14 +204,8 @@ func (c *Connector) UpdateUser(ctx context.Context, db *sql.DB, user *model.User
 	// }
 
 	// Check if the database connection is nil.
-	if db == nil {
-		return errors.New("database connection is nil")
-	}
-
-	// Check if the database is alive by pinging it.
-	err = db.PingContext(ctx)
-	if err != nil {
-		return fmt.Errorf("database ping failed: %v", err)
+	if err := c.validateDatabaseConnection(ctx, db); err != nil {
+		return err
 	}
 
 	var altered = false // Flag to indicate if the user has been altered.
@@ -275,7 +215,7 @@ func (c *Connector) UpdateUser(ctx context.Context, db *sql.DB, user *model.User
 
 	if user.DefaultSchema != "" && user.DefaultSchema != originalUser.DefaultSchema {
 		altered = true
-		query = query + " + 'DEFAULT_SCHEMA = ' + QuoteName(user.DefaultSchema) + ', '"
+		query = query + " + 'DEFAULT_SCHEMA = ' + QuoteName(@defaultSchema) + ', '"
 	}
 
 	if !c.isAzureDatabase && user.DefaultLanguage != originalUser.DefaultLanguage {
@@ -293,11 +233,6 @@ func (c *Connector) UpdateUser(ctx context.Context, db *sql.DB, user *model.User
 		query = query + " + 'PASSWORD = ' + QUOTENAME(@password, '''') + ', '"
 	}
 
-	if user.LoginName != originalUser.LoginName {
-		altered = true
-		query = query + " + 'LOGIN = ' + QuoteName(@loginName) + ', '"
-	}
-
 	if !altered {
 		return nil
 	}
@@ -313,27 +248,27 @@ func (c *Connector) UpdateUser(ctx context.Context, db *sql.DB, user *model.User
 		tsql,
 		sql.Named("name", user.Name),
 		sql.Named("password", user.Password),
-		sql.Named("loginName", user.LoginName),
 		sql.Named("defaultSchema", user.DefaultSchema),
 		sql.Named("defaultLanguage", user.DefaultLanguage))
 
 	if err != nil {
-		return fmt.Errorf("cannot update user. Underlying sql error : %v", err)
+		return fmt.Errorf("cannot update user. Underlying sql error : %w", err)
 	}
 
 	return nil
 
 }
 
-// DeleteUser deletes a user
-// If any error occurs, it returns an error object with the reason.
+// DeleteUser deletes a user from the specified database.
+// It takes a context, a database connection, and a user model as input.
+// It returns an error if the user deletion fails, or nil if successful.
 func (c *Connector) DeleteUser(ctx context.Context, db *sql.DB, user *model.User) error {
 	var err error
 
 	// Get the original user
 	_, err = c.GetUser(ctx, db, user)
 	if err != nil {
-		return fmt.Errorf("cannot retrieve the user to delete. Underlying sql error : %v", err)
+		return fmt.Errorf("cannot retrieve the user to delete. Underlying sql error : %w", err)
 	}
 
 	// if originalUser.External {
@@ -341,14 +276,8 @@ func (c *Connector) DeleteUser(ctx context.Context, db *sql.DB, user *model.User
 	// }
 
 	// Check if the database connection is nil.
-	if db == nil {
-		return errors.New("database connection is nil")
-	}
-
-	// Check if the database is alive by pinging it.
-	err = db.PingContext(ctx)
-	if err != nil {
-		return fmt.Errorf("database ping failed: %v", err)
+	if err := c.validateDatabaseConnection(ctx, db); err != nil {
+		return err
 	}
 
 	// SQL query to delete a user
@@ -364,7 +293,7 @@ func (c *Connector) DeleteUser(ctx context.Context, db *sql.DB, user *model.User
 	)
 
 	if err != nil {
-		return fmt.Errorf("cannot delete user. Underlying sql error : %v", err)
+		return fmt.Errorf("cannot delete user. Underlying sql error : %w", err)
 	}
 
 	return nil

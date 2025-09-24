@@ -14,17 +14,6 @@ Database Role Resource
 
 ```terraform
 resource "mssqlpermissions_database_role_members" "role" {
-  config = {
-    server_fqdn   = "mssql-fixture"
-    server_port   = 1433
-    database_name = "ApplicationDB"
-
-    sql_login = {
-      username = "sa"
-      password = "P@ssw0rd"
-    }
-  }
-
   name = "my-database-role"
   members = [
     "fixtureOne",
@@ -42,56 +31,4 @@ resource "mssqlpermissions_database_role_members" "role" {
 
 ### Optional
 
-- `config` (Attributes) The database connection configuration (see [below for nested schema](#nestedatt--config))
 - `members` (List of String) The database role's members.
-
-<a id="nestedatt--config"></a>
-### Nested Schema for `config`
-
-Required:
-
-- `database_name` (String) The SQL Server database name.
-- `server_fqdn` (String) The SQL Server FQDN.
-
-Optional:
-
-- `federated_login` (Attributes) Connect using a Federated Identity (see [below for nested schema](#nestedatt--config--federated_login))
-- `msi_login` (Attributes) Connect using a Managed Identity. (see [below for nested schema](#nestedatt--config--msi_login))
-- `server_port` (Number) The SQL Server port.
-- `spn_login` (Attributes) Connect using a Service Principal Name (SPN). (see [below for nested schema](#nestedatt--config--spn_login))
-- `sql_login` (Attributes) The SQL Server login configuration. Use to connect to the Database using SQL Authentication. (see [below for nested schema](#nestedatt--config--sql_login))
-
-<a id="nestedatt--config--federated_login"></a>
-### Nested Schema for `config.federated_login`
-
-
-<a id="nestedatt--config--msi_login"></a>
-### Nested Schema for `config.msi_login`
-
-Required:
-
-- `user_identity` (Boolean) Use the user identity.
-
-Optional:
-
-- `resource_id` (String) The resource identity. Required if user_identity is false.
-- `user_id` (String) The user identity. Required if user_identity is true.
-
-
-<a id="nestedatt--config--spn_login"></a>
-### Nested Schema for `config.spn_login`
-
-Required:
-
-- `client_id` (String) The Azure AD application client ID.
-- `client_secret` (String) The Azure AD application client secret.
-- `tenant_id` (String) The Azure AD tenant ID.
-
-
-<a id="nestedatt--config--sql_login"></a>
-### Nested Schema for `config.sql_login`
-
-Required:
-
-- `password` (String) The SQL Server login password.
-- `username` (String) The SQL Server login username.

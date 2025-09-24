@@ -26,18 +26,18 @@ func TestAccUserDataSource(t *testing.T) {
 
 func testAccUserDataSourceConfig() string {
 	return fmt.Sprintf(`
-data "mssqlpermissions_user" "test" {
-	config = {
-		server_fqdn   = %q
-		server_port   = %q
-		database_name = "ApplicationDB"
+provider "mssqlpermissions" {
+	server_fqdn   = %q
+	server_port   = %q
+	database_name = "ApplicationDB"
 
-		sql_login = {
-			username = "sa"
-			password = "P@ssw0rd"
-		}
+	sql_login = {
+		username = "sa"
+		password = "P@ssw0rd"
 	}
+}
 
+data "mssqlpermissions_user" "test" {
 	name = "dbo"
 }
 `, os.Getenv("LOCAL_SQL_HOST"), os.Getenv("LOCAL_SQL_PORT"))

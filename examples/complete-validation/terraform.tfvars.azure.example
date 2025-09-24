@@ -1,0 +1,11 @@
+# Example configuration for Azure testing
+server_fqdn   = "your-server.database.windows.net"
+server_port   = 1433
+database_name = "ApplicationDB"
+
+use_sql_auth   = false
+use_azure_auth = true
+
+azure_tenant_id     = "your-tenant-id"
+azure_client_id     = "your-client-id"
+azure_client_secret = "your-client-secret"
