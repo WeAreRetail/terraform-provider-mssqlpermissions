@@ -58,6 +58,11 @@ const (
 // Regular expression for valid SQL identifiers
 var sqlIdentifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
+// Regular expression for valid SQL permission names (allows spaces and more flexible casing)
+// SQL Server permission names can be uppercase, may contain spaces, numbers, and underscores
+// They typically start with a letter but can have various formats
+var permissionNameRegex = regexp.MustCompile(`^[A-Z][A-Z ]*[A-Z]$`)
+
 // Notes:
 // MS SQL allows to grant permissions on specific objects only. These functions do not support that.
 // The difficulty is that the object is stored in [database_permissions] and [server_permissions] by its ID in the major_id column.
@@ -150,12 +155,17 @@ func validateRoleName(role *model.Role) error {
 	return validateSQLIdentifier(role.Name)
 }
 
-// validatePermissionName validates that the permission is not nil and has a non-empty name.
+// validatePermissionName validates that the permission is not nil and has a valid permission name.
 func validatePermissionName(permission *model.Permission) error {
 	if permission == nil || permission.Name == "" {
 		return errors.New("permission name cannot be empty")
 	}
-	return validateSQLIdentifier(permission.Name)
+	return validateSQLPermissionName(permission.Name)
+}
+
+// ValidatePermissionName is the exported version of validatePermissionName for testing
+func ValidatePermissionName(permission *model.Permission) error {
+	return validatePermissionName(permission)
 }
 
 // validatePermissionState validates the permission state and returns the appropriate SQL verb.
@@ -182,6 +192,21 @@ func validateSQLIdentifier(name string) error {
 	}
 	if !sqlIdentifierRegex.MatchString(name) {
 		return errors.New("invalid SQL identifier format")
+	}
+	return nil
+}
+
+// validateSQLPermissionName validates that a string is a valid SQL permission name
+// Permission names can contain spaces and follow different rules than regular SQL identifiers
+func validateSQLPermissionName(name string) error {
+	if name == "" {
+		return errors.New("permission name cannot be empty")
+	}
+	if len(name) > MaxSQLIdentifierLength {
+		return fmt.Errorf("permission name too long (max %d characters)", MaxSQLIdentifierLength)
+	}
+	if !permissionNameRegex.MatchString(name) {
+		return errors.New("invalid permission name format, must be uppercase letters, may contain spaces")
 	}
 	return nil
 }

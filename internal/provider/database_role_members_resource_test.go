@@ -6,6 +6,7 @@ import (
 	"terraform-provider-mssqlpermissions/internal/queries"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -173,7 +174,7 @@ func TestDatabaseRoleMembersResource_ImportState(t *testing.T) {
 func createEmptyRoleMembersModel() model.RoleMembersModel {
 	return model.RoleMembersModel{
 		Name:    types.StringValue("empty_role"),
-		Members: []types.String{},
+		Members: types.ListValueMust(types.StringType, []attr.Value{}),
 	}
 }
 
@@ -314,7 +315,7 @@ func TestNewDatabaseRoleMembersResource(t *testing.T) {
 func TestMemberManagementEdgeCases(t *testing.T) {
 	t.Run("EmptyMembersList", func(t *testing.T) {
 		model := createEmptyRoleMembersModel()
-		if len(model.Members) != 0 {
+		if len(model.Members.Elements()) != 0 {
 			t.Error("Expected empty members list")
 		}
 	})

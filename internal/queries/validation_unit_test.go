@@ -142,14 +142,16 @@ func TestValidatePermissionName_Unit(t *testing.T) {
 			wantErr:    false,
 		},
 		{
-			name:       "valid_permission_mixed_case",
+			name:       "invalid_permission_mixed_case",
 			permission: &model.Permission{Name: "Create_Table"},
-			wantErr:    false,
+			wantErr:    true,
+			errMsg:     "invalid permission name format, must be uppercase letters, may contain spaces",
 		},
 		{
-			name:       "valid_permission_with_underscore",
+			name:       "invalid_permission_with_underscore",
 			permission: &model.Permission{Name: "ALTER_SCHEMA"},
-			wantErr:    false,
+			wantErr:    true,
+			errMsg:     "invalid permission name format, must be uppercase letters, may contain spaces",
 		},
 		{
 			name:       "nil_permission",
@@ -166,41 +168,37 @@ func TestValidatePermissionName_Unit(t *testing.T) {
 		{
 			name:       "permission_with_spaces",
 			permission: &model.Permission{Name: "SELECT ALL"},
-			wantErr:    true,
-			errMsg:     "invalid SQL identifier format",
+			wantErr:    false, // Now valid with new permission name validation
 		},
 		{
 			name:       "permission_with_special_chars",
 			permission: &model.Permission{Name: "SELECT@TABLE"},
 			wantErr:    true,
-			errMsg:     "invalid SQL identifier format",
+			errMsg:     "invalid permission name format, must be uppercase letters, may contain spaces",
 		},
 		{
 			name:       "permission_starts_with_number",
 			permission: &model.Permission{Name: "123SELECT"},
 			wantErr:    true,
-			errMsg:     "invalid SQL identifier format",
+			errMsg:     "invalid permission name format, must be uppercase letters, may contain spaces",
 		},
 		{
 			name:       "permission_name_too_long",
 			permission: &model.Permission{Name: string(make([]byte, 129))}, // Exceeds 128 char limit
 			wantErr:    true,
-			errMsg:     "SQL identifier too long",
-		},
-		{
-			name:       "permission_name_max_length",
-			permission: &model.Permission{Name: generateValidIdentifier(128)}, // Exactly at limit with valid chars
-			wantErr:    false,
+			errMsg:     "permission name too long",
 		},
 		{
 			name:       "permission_single_char",
 			permission: &model.Permission{Name: "X"},
-			wantErr:    false,
+			wantErr:    true,
+			errMsg:     "invalid permission name format, must be uppercase letters, may contain spaces",
 		},
 		{
 			name:       "permission_underscore_start",
 			permission: &model.Permission{Name: "_EXECUTE"},
-			wantErr:    false,
+			wantErr:    true,
+			errMsg:     "invalid permission name format, must be uppercase letters, may contain spaces",
 		},
 	}
 

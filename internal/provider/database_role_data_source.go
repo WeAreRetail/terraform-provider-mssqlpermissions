@@ -153,9 +153,18 @@ func (d *databaseRoleDataSource) Read(ctx context.Context, req datasource.ReadRe
 	}
 
 	// Get all members name and add to state.members
+	var memberNames []string
 	for _, member := range members {
-		state.Members = append(state.Members, types.StringValue(member.Name))
+		memberNames = append(memberNames, member.Name)
 	}
+
+	// Convert string slice to types.List
+	membersList, convertDiags := convertStringSliceToList(ctx, memberNames)
+	if convertDiags != nil {
+		resp.Diagnostics.Append(*convertDiags...)
+		return
+	}
+	state.Members = membersList
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)

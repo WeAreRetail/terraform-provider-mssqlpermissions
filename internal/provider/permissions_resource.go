@@ -6,6 +6,8 @@ import (
 	"terraform-provider-mssqlpermissions/internal/queries"
 	qmodel "terraform-provider-mssqlpermissions/internal/queries/model"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -138,8 +140,8 @@ func (r *PermissionsResource) ValidateConfig(ctx context.Context, req resource.V
 		)
 	}
 
-	// Validate permissions array is not empty
-	if len(config.Permissions) == 0 {
+	// Validate permissions array is not empty (skip validation if unknown - e.g., from data source)
+	if !config.Permissions.IsUnknown() && (config.Permissions.IsNull() || len(config.Permissions.Elements()) == 0) {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("permissions"),
 			"Missing Permissions",
@@ -148,8 +150,20 @@ func (r *PermissionsResource) ValidateConfig(ctx context.Context, req resource.V
 		return // Exit early if no permissions to validate
 	}
 
+	// Skip validation if permissions are unknown (e.g., from data source)
+	if config.Permissions.IsUnknown() {
+		return
+	}
+
+	// Convert permissions list to slice for validation
+	permissions, diags := convertPermissionsListToSlice(ctx, config.Permissions)
+	if diags != nil {
+		resp.Diagnostics.Append(*diags...)
+		return
+	}
+
 	// Validate each permission
-	for i, permission := range config.Permissions {
+	for i, permission := range permissions {
 		permissionPath := path.Root("permissions").AtListIndex(i)
 
 		// Validate permission name is not empty
@@ -231,7 +245,14 @@ func (r *PermissionsResource) Create(ctx context.Context, req resource.CreateReq
 	// Assign permissions to the role.
 	var updatedPermissions []model.PermissionModel
 
-	for _, permissionState := range state.Permissions {
+	// Convert permissions list to slice for processing
+	permissions, diags := convertPermissionsListToSlice(ctx, state.Permissions)
+	if diags != nil {
+		resp.Diagnostics.Append(*diags...)
+		return
+	}
+
+	for _, permissionState := range permissions {
 		permission := &qmodel.Permission{
 			Name:  permissionState.Name.ValueString(),
 			State: permissionState.State.ValueString(),
@@ -266,7 +287,13 @@ func (r *PermissionsResource) Create(ctx context.Context, req resource.CreateReq
 		)
 	}
 
-	state.Permissions = updatedPermissions
+	// Convert back to types.List
+	updatedPermissionsList, diags := convertPermissionsSliceToList(ctx, updatedPermissions)
+	if diags != nil {
+		resp.Diagnostics.Append(*diags...)
+		return
+	}
+	state.Permissions = updatedPermissionsList
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	logResourceOperationComplete(ctx, "PermissionsResource", "Create")
@@ -307,7 +334,14 @@ func (r *PermissionsResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	// Remove permissions from the role.
-	for _, permissionState := range state.Permissions {
+	// Convert permissions list to slice for processing
+	permissions, diags := convertPermissionsListToSlice(ctx, state.Permissions)
+	if diags != nil {
+		resp.Diagnostics.Append(*diags...)
+		return
+	}
+
+	for _, permissionState := range permissions {
 		permission := &qmodel.Permission{
 			Name: permissionState.Name.ValueString(),
 		}
@@ -319,7 +353,13 @@ func (r *PermissionsResource) Delete(ctx context.Context, req resource.DeleteReq
 		}
 	}
 
-	state.Permissions = []model.PermissionModel{}
+	// Set empty permissions list
+	emptyPermissionsList, diags := convertPermissionsSliceToList(ctx, []model.PermissionModel{})
+	if diags != nil {
+		resp.Diagnostics.Append(*diags...)
+		return
+	}
+	state.Permissions = emptyPermissionsList
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	logResourceOperationComplete(ctx, "PermissionsResource", "Delete")
@@ -371,7 +411,14 @@ func (r *PermissionsResource) Read(ctx context.Context, req resource.ReadRequest
 	// Get the permissions for the role.
 	var readPermissions []model.PermissionModel
 
-	for _, permissionState := range state.Permissions {
+	// Convert permissions list to slice for processing
+	permissions, diags := convertPermissionsListToSlice(ctx, state.Permissions)
+	if diags != nil {
+		resp.Diagnostics.Append(*diags...)
+		return
+	}
+
+	for _, permissionState := range permissions {
 		permission := &qmodel.Permission{
 			Name: permissionState.Name.ValueString(),
 		}
@@ -404,7 +451,13 @@ func (r *PermissionsResource) Read(ctx context.Context, req resource.ReadRequest
 		)
 	}
 
-	state.Permissions = readPermissions
+	// Convert back to types.List
+	readPermissionsList, diags := convertPermissionsSliceToList(ctx, readPermissions)
+	if diags != nil {
+		resp.Diagnostics.Append(*diags...)
+		return
+	}
+	state.Permissions = readPermissionsList
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	logResourceOperationComplete(ctx, "PermissionsResource", "Read")
@@ -450,7 +503,15 @@ func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateReq
 	// As the permissions are defined in a list, the order is not guaranteed.
 	// Therefore, we need to delete all permissions and then re-add them.
 	// We take all the permissions in the current state and remove them.
-	for _, permissionState := range state.Permissions {
+
+	// Convert state permissions list to slice for processing
+	statePermissions, diags := convertPermissionsListToSlice(ctx, state.Permissions)
+	if diags != nil {
+		resp.Diagnostics.Append(*diags...)
+		return
+	}
+
+	for _, permissionState := range statePermissions {
 		permission := &qmodel.Permission{
 			Name: permissionState.Name.ValueString(),
 		}
@@ -466,7 +527,14 @@ func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateReq
 	// We take all the permissions in the plan and add them.
 	var updatedPermissions []model.PermissionModel
 
-	for _, permissionPlan := range plan.Permissions {
+	// Convert plan permissions list to slice for processing
+	planPermissions, diags := convertPermissionsListToSlice(ctx, plan.Permissions)
+	if diags != nil {
+		resp.Diagnostics.Append(*diags...)
+		return
+	}
+
+	for _, permissionPlan := range planPermissions {
 		permission := &qmodel.Permission{
 			Name:  permissionPlan.Name.ValueString(),
 			State: permissionPlan.State.ValueString(),
@@ -501,7 +569,13 @@ func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateReq
 		)
 	}
 
-	state.Permissions = updatedPermissions
+	// Convert back to types.List
+	updatedPermissionsList, diags := convertPermissionsSliceToList(ctx, updatedPermissions)
+	if diags != nil {
+		resp.Diagnostics.Append(*diags...)
+		return
+	}
+	state.Permissions = updatedPermissionsList
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 	logResourceOperationComplete(ctx, "PermissionsResource", "Update")
@@ -510,4 +584,43 @@ func (r *PermissionsResource) Update(ctx context.Context, req resource.UpdateReq
 // ImportState implements resource.ResourceWithImportState.
 func (r *PermissionsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	panic("not implemented")
+}
+
+// getPermissionAttrTypes returns the attribute types for the permission model
+func getPermissionAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"class":                types.StringType,
+		"class_desc":           types.StringType,
+		"major_id":             types.Int64Type,
+		"minor_id":             types.Int64Type,
+		"grantee_principal_id": types.Int64Type,
+		"grantor_principal_id": types.Int64Type,
+		"type":                 types.StringType,
+		"permission_name":      types.StringType,
+		"state":                types.StringType,
+		"state_desc":           types.StringType,
+	}
+}
+
+// convertPermissionsListToSlice converts a types.List to []model.PermissionModel
+func convertPermissionsListToSlice(ctx context.Context, permissionsList types.List) ([]model.PermissionModel, *diag.Diagnostics) {
+	var permissions []model.PermissionModel
+	diags := permissionsList.ElementsAs(ctx, &permissions, false)
+	if diags.HasError() {
+		return nil, &diags
+	}
+	return permissions, nil
+}
+
+// convertPermissionsSliceToList converts []model.PermissionModel to types.List
+func convertPermissionsSliceToList(ctx context.Context, permissions []model.PermissionModel) (types.List, *diag.Diagnostics) {
+	permissionsList, diags := types.ListValueFrom(ctx, types.ObjectType{
+		AttrTypes: getPermissionAttrTypes(),
+	}, permissions)
+
+	if diags.HasError() {
+		return types.ListUnknown(types.ObjectType{AttrTypes: getPermissionAttrTypes()}), &diags
+	}
+
+	return permissionsList, nil
 }

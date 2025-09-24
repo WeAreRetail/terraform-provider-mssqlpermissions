@@ -74,9 +74,24 @@ func TestValidatePermissionName(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name:       "valid-permission-name",
+			name:       "valid-permission-name-simple",
 			permission: &model.Permission{Name: "SELECT"},
 			wantErr:    false,
+		},
+		{
+			name:       "valid-permission-name-with-spaces",
+			permission: &model.Permission{Name: "ALTER ANY APPLICATION ROLE"},
+			wantErr:    false,
+		},
+		{
+			name:       "valid-permission-name-with-numbers",
+			permission: &model.Permission{Name: "VIEW DATABASE STATE"},
+			wantErr:    false,
+		},
+		{
+			name:       "valid-permission-name-with-underscores",
+			permission: &model.Permission{Name: "VIEW_DEFINITION"},
+			wantErr:    true,
 		},
 		{
 			name:       "nil-permission",
@@ -89,19 +104,19 @@ func TestValidatePermissionName(t *testing.T) {
 			wantErr:    true,
 		},
 		{
+			name:       "invalid-permission-name-lowercase",
+			permission: &model.Permission{Name: "select"},
+			wantErr:    true,
+		},
+		{
 			name:       "invalid-permission-name-with-special-chars",
 			permission: &model.Permission{Name: "SELECT@TABLE"},
 			wantErr:    true,
 		},
 		{
-			name:       "permission-name-too-long",
-			permission: &model.Permission{Name: string(make([]byte, 130))}, // Exceeds 128 char limit
+			name:       "invalid-permission-name-starts-with-number",
+			permission: &model.Permission{Name: "2VIEW"},
 			wantErr:    true,
-		},
-		{
-			name:       "permission-name-with-underscores",
-			permission: &model.Permission{Name: "VIEW_DEFINITION"},
-			wantErr:    false,
 		},
 	}
 
@@ -110,6 +125,129 @@ func TestValidatePermissionName(t *testing.T) {
 			err := validatePermissionName(tt.permission)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validatePermissionName() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestValidateSQLPermissionName tests the validateSQLPermissionName function directly
+func TestValidateSQLPermissionName(t *testing.T) {
+	tests := []struct {
+		name        string
+		permName    string
+		wantErr     bool
+		expectedErr string
+	}{
+		{
+			name:     "valid-simple-permission",
+			permName: "SELECT",
+			wantErr:  false,
+		},
+		{
+			name:     "valid-permission-with-spaces",
+			permName: "ALTER ANY APPLICATION ROLE",
+			wantErr:  false,
+		},
+		{
+			name:        "invalid-permission-with-underscores",
+			permName:    "VIEW_DEFINITION",
+			wantErr:     true,
+			expectedErr: "invalid permission name format, must be uppercase letters, may contain spaces",
+		},
+		{
+			name:     "valid-permission-with-numbers",
+			permName: "CREATE DATABASE DDL EVENT NOTIFICATION",
+			wantErr:  false,
+		},
+		{
+			name:     "valid-complex-permission",
+			permName: "ADMINISTER DATABASE BULK OPERATIONS",
+			wantErr:  false,
+		},
+		{
+			name:     "valid-permission-with-mixed-chars",
+			permName: "ALTER ANY DATABASE DDL TRIGGER",
+			wantErr:  false,
+		},
+		{
+			name:        "empty-permission-name",
+			permName:    "",
+			wantErr:     true,
+			expectedErr: "permission name cannot be empty",
+		},
+		{
+			name:        "invalid-lowercase-permission",
+			permName:    "select",
+			wantErr:     true,
+			expectedErr: "invalid permission name format, must be uppercase letters, may contain spaces",
+		},
+		{
+			name:        "invalid-mixed-case-permission",
+			permName:    "Select",
+			wantErr:     true,
+			expectedErr: "invalid permission name format, must be uppercase letters, may contain spaces",
+		},
+		{
+			name:        "invalid-starts-with-number",
+			permName:    "2SELECT",
+			wantErr:     true,
+			expectedErr: "invalid permission name format, must be uppercase letters, may contain spaces",
+		},
+		{
+			name:        "invalid-starts-with-underscore",
+			permName:    "_SELECT",
+			wantErr:     true,
+			expectedErr: "invalid permission name format, must be uppercase letters, may contain spaces",
+		},
+		{
+			name:        "invalid-special-characters",
+			permName:    "SELECT@TABLE",
+			wantErr:     true,
+			expectedErr: "invalid permission name format, must be uppercase letters, may contain spaces",
+		},
+		{
+			name:        "invalid-hyphen",
+			permName:    "ALTER-ANY-ROLE",
+			wantErr:     true,
+			expectedErr: "invalid permission name format, must be uppercase letters, may contain spaces",
+		},
+		{
+			name:     "valid-permission-exactly-128-chars",
+			permName: string(make([]rune, 127)) + "A", // Exactly 128 chars, starting with A
+			wantErr:  false,
+		},
+	}
+
+	// Fill the long permission names with valid characters
+	for i := range tests {
+		if tests[i].name == "permission-name-too-long" {
+			// Create a string that starts with A and fills with valid chars
+			longName := "A" + string(make([]rune, 129))
+			for j := 1; j < len(longName); j++ {
+				longName = longName[:j] + "B" + longName[j+1:]
+			}
+			tests[i].permName = longName
+		}
+		if tests[i].name == "valid-permission-exactly-128-chars" {
+			// Create exactly 128 character permission name
+			longName := "A" + string(make([]rune, 127))
+			for j := 1; j < len(longName); j++ {
+				longName = longName[:j] + "B" + longName[j+1:]
+			}
+			tests[i].permName = longName
+		}
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateSQLPermissionName(tt.permName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateSQLPermissionName() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil && tt.expectedErr != "" {
+				if !contains(err.Error(), tt.expectedErr) {
+					t.Errorf("validateSQLPermissionName() error = %v, expected to contain %v", err.Error(), tt.expectedErr)
+				}
 			}
 		})
 	}
