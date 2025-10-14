@@ -9,6 +9,7 @@ import (
 	"terraform-provider-mssqlpermissions/internal/queries/model"
 )
 
+// #region Constants and Variables
 // ============================================================================
 // CONSTANTS AND VARIABLES
 // ============================================================================
@@ -69,7 +70,9 @@ var permissionNameRegex = regexp.MustCompile(`^[A-Z][A-Z ]*[A-Z]$`)
 // With additional sub-object ID, like the column, in the minor_id column.
 // It means we need to query multiple views based on the object type to retrieve the full definition of the permission.
 // Schemas would be in sys.schemas, tables in sys.tables, columns in sys.columns, etc.
+// #endregion
 
+// #region Helper and Utility Functions
 // ============================================================================
 // HELPER AND UTILITY FUNCTIONS
 // ============================================================================
@@ -140,6 +143,9 @@ func (c *Connector) executePermissionsInTransaction(ctx context.Context, db *sql
 	return nil
 }
 
+// #endregion
+
+// #region Validation Functions
 // ============================================================================
 // VALIDATION FUNCTIONS
 // ============================================================================
@@ -219,6 +225,9 @@ func validateSchemaName(schema string) error {
 	return validateSQLIdentifier(schema)
 }
 
+// #endregion
+
+// #region Core Permission Operations - Database Level
 // ============================================================================
 // CORE PERMISSION OPERATIONS - DATABASE LEVEL
 // ============================================================================
@@ -375,6 +384,9 @@ func (c *Connector) RevokePermissionsFromRole(ctx context.Context, db *sql.DB, r
 	return nil
 }
 
+// #endregion
+
+// #region Schema-Level Permission Operations
 // ============================================================================
 // SCHEMA-LEVEL PERMISSION OPERATIONS
 // ============================================================================
@@ -516,6 +528,9 @@ func (c *Connector) RevokePermissionsOnSchemaFromRole(ctx context.Context, db *s
 	return nil
 }
 
+// #endregion
+
+// #region Transaction-Enabled Batch Operations
 // ============================================================================
 // TRANSACTION-ENABLED BATCH OPERATIONS
 // ============================================================================
@@ -590,6 +605,9 @@ func (c *Connector) RevokePermissionsOnSchemaFromRoleWithTransaction(ctx context
 	return c.executePermissionsInTransaction(ctx, db, operations)
 }
 
+// #endregion
+
+// #region Private Transaction Helper Functions
 // ============================================================================
 // PRIVATE TRANSACTION HELPER FUNCTIONS
 // ============================================================================
@@ -630,6 +648,9 @@ func (c *Connector) revokePermissionOnSchemaFromRoleInTx(ctx context.Context, tx
 	return nil
 }
 
+// #endregion
+
+// #region Query/Retrieval Functions
 // ============================================================================
 // QUERY/RETRIEVAL FUNCTIONS
 // ============================================================================
@@ -817,6 +838,9 @@ func (c *Connector) GetSchemaPermissionForRole(ctx context.Context, db *sql.DB, 
 	return permission, nil
 }
 
+// #endregion
+
+// #region Test Helper Functions
 // ============================================================================
 // TEST HELPER FUNCTIONS
 // ============================================================================
@@ -843,3 +867,5 @@ func CreateTestPermissionWithStateDesc(name, stateDesc string) *model.Permission
 		StateDesc: stateDesc,
 	}
 }
+
+// #endregion

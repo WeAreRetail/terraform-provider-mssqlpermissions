@@ -19,6 +19,8 @@ ignorePaths:
   - infra/modules/**
   - bin
   - obj
+  - go.mod
+  - go.sum
 
 enableFiletypes:
   - azure-pipelines

@@ -230,7 +230,7 @@ tasks:
     desc: Update Go dependencies and tidy go.mod
     aliases: [go-update]
     cmds:
-      - go get -u ./...
+      - go get -u -t ./...
       - go mod tidy
 
   terraform:update:
@@ -292,7 +292,7 @@ tasks:
   validate:azure:
     desc: Run validation against Azure infrastructure (use INTERACTIVE=1 for manual checkpoints)
     aliases: [validate-azure, va]
-    deps: ["infra:azure:reset", "install"]
+    deps: ["install"]
     dir: examples/complete-validation
     silent: true
     vars:
