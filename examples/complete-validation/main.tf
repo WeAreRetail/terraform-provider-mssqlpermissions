@@ -48,14 +48,14 @@ locals {
 # Create test users
 resource "mssqlpermissions_user" "test_user_1" {
   name     = "test_user_validation_1"
-  external = var.use_azure_auth
-  password = var.use_azure_auth ? null : var.test_user_password
+  external = var.create_azure_ad_user
+  password = var.create_azure_ad_user ? null : var.test_user_password
 }
 
 resource "mssqlpermissions_user" "test_user_2" {
   name     = "test_user_validation_2"
-  external = var.use_azure_auth
-  password = var.use_azure_auth ? null : var.test_user_password
+  external = var.create_azure_ad_user
+  password = var.create_azure_ad_user ? null : var.test_user_password
 }
 
 # Create test database role
@@ -89,6 +89,22 @@ resource "mssqlpermissions_permissions_to_role" "test_permissions" {
 resource "mssqlpermissions_permissions_to_role" "test_permissions_deny" {
   role_name   = mssqlpermissions_database_role.test_role.name
   permissions = local.permissions_deny_list_of_maps
+}
+
+# Grant schema-level permissions to role
+resource "mssqlpermissions_schema_permissions" "test_schema_permissions" {
+  schema_name = "dbo"
+  role_name   = mssqlpermissions_database_role.test_role.name
+  permissions = [
+    {
+      permission_name = "SELECT"
+      state           = "G"
+    },
+    {
+      permission_name = "INSERT"
+      state           = "G"
+    }
+  ]
 }
 
 

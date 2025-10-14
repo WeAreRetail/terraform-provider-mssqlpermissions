@@ -27,6 +27,12 @@ variable "use_azure_auth" {
   default     = false
 }
 
+variable "create_azure_ad_user" {
+  description = "Create Azure AD users instead of SQL users for testing"
+  type        = bool
+  default     = false
+}
+
 variable "sql_username" {
   description = "SQL Server username (when using SQL auth)"
   type        = string
@@ -44,7 +50,7 @@ variable "test_user_password" {
   description = "Password for test users (when not using Azure auth)"
   type        = string
   sensitive   = true
-  default     = "TestP@ssw0rd123"
+  default     = "UntrustedP@ssw0rd123"
 }
 
 variable "azure_tenant_id" {

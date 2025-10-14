@@ -164,6 +164,7 @@ func (p *SqlPermissionsProvider) Resources(ctx context.Context) []func() resourc
 		NewDatabaseRoleMembersResource,
 		NewDatabaseRoleResource,
 		NewPermissionsResource,
+		NewSchemaPermissionsResource,
 		NewUserResource,
 	}
 }
@@ -173,6 +174,9 @@ func (p *SqlPermissionsProvider) Resources(ctx context.Context) []func() resourc
 func (p *SqlPermissionsProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewDatabaseRoleDataSource,
+		NewDatabaseRoleMembersDataSource,
+		NewPermissionsDataSource,
+		NewSchemaPermissionsDataSource,
 		NewUserDataSource,
 	}
 }

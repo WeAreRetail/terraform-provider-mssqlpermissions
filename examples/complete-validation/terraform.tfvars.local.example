@@ -9,4 +9,4 @@ use_azure_auth = false
 sql_username = "sa"
 sql_password = "P@ssw0rd"
 
-test_user_password = "TestP@ssw0rd123"
+test_user_password = "UntrustedP@ssw0rd123"

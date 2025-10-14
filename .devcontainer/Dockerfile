@@ -2,9 +2,16 @@
 ARG GO_TAG=1.24-bookworm
 FROM mcr.microsoft.com/devcontainers/go:${GO_TAG}
 
+# Tool versions
 ARG REMOTE_USER=vscode
-ARG DELVE_VERSION=1.25.1
+ARG DELVE_VERSION=1.25.2
 ARG GOLANGCI_LINT_VERSION=v2.5.0
+ARG GORELEASER_VERSION=v2.11.2
+ARG GOPLS_VERSION=latest
+ARG STATICCHECK_VERSION=latest
+ARG SHFMT_VERSION=latest
+ARG GO_MOD_OUTDATED_VERSION=latest
+ARG GOIMPORTS_VERSION=latest
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -44,19 +51,19 @@ RUN \
     # --> Delve for debugging
     go install github.com/go-delve/delve/cmd/dlv@v${DELVE_VERSION} \
     # --> Go language server
-    && go install golang.org/x/tools/gopls@latest \
+    && go install golang.org/x/tools/gopls@${GOPLS_VERSION} \
     # --> GolangCI-lint (updated installation method)
     && curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION} \
     # --> Staticcheck
-    && go install honnef.co/go/tools/cmd/staticcheck@latest \
+    && go install honnef.co/go/tools/cmd/staticcheck@${STATICCHECK_VERSION} \
     # --> GoReleaser
-    && go install github.com/goreleaser/goreleaser/v2@v2.11.2 \
+    && go install github.com/goreleaser/goreleaser/v2@${GORELEASER_VERSION} \
     # --> shfmt
-    && go install mvdan.cc/sh/v3/cmd/shfmt@latest \
+    && go install mvdan.cc/sh/v3/cmd/shfmt@${SHFMT_VERSION} \
     # --> go-mod-outdated for dependency management
-    && go install github.com/psampaz/go-mod-outdated@latest \
+    && go install github.com/psampaz/go-mod-outdated@${GO_MOD_OUTDATED_VERSION} \
     # --> goimports for code formatting
-    && go install golang.org/x/tools/cmd/goimports@latest \
+    && go install golang.org/x/tools/cmd/goimports@${GOIMPORTS_VERSION} \
     #
     # Clean up
     && rm -rf /go/src/ && rm -rf /go/pkg
@@ -77,6 +84,7 @@ RUN \
     && echo "alias la=\"eza -la --icons\"" >> "$HOME/.bashrc" \
     && echo "alias ls=\"eza --icons\"" >> "$HOME/.bashrc" \
     && echo 'eval "$(starship init bash)"' >> "$HOME/.bashrc" \
+    && echo 'eval "$(task --completion bash)"' >> "$HOME/.bashrc" \
     && echo "export PATH=$PATH:/usr/bin/"  >> "$HOME/.bashrc" \
     && cp "/tmp/.terraformrc" "$HOME/.terraformrc"
 

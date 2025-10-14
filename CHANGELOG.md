@@ -1,5 +1,44 @@
 <!-- markdownlint-disable-file MD024 MD041 -->
 
+## 1.1.0
+
+NEW FEATURES:
+
+* New resource: `mssqlpermissions_schema_permissions` - Manage schema-level permissions on SQL Server databases
+* New data source: `mssqlpermissions_database_role_members` - Query role membership
+* New data source: `mssqlpermissions_permissions_to_role` - Query database-level permissions for a role
+* New data source: `mssqlpermissions_schema_permissions` - Query schema-level permissions for a role
+
+ENHANCEMENTS:
+
+* Complete resource/data source parity - all 5 resources now have matching data sources
+* Improved documentation with comprehensive examples for all data sources
+
+## 1.0.1
+
+BUG FIXES:
+
+* Fix various permissions issues
+* Improve permission handling and validation
+
+## 1.0.0
+
+⚠️ BREAKING CHANGES:
+
+* Remove configuration block from resources (use provider-level config instead)
+* Remove support for server-only objects (login and server role) - focus on contained databases only
+* Remove role membership management from role resource (use `mssqlpermissions_database_role_members` instead)
+* Remove `mssqlpermissions_server_role_members` resource
+
+ENHANCEMENTS:
+
+* Add comprehensive unit tests alongside acceptance tests
+* Add queries to manage schema permissions (backend support)
+* Update Go to 1.24
+* Update all dependencies
+* Update dev container
+* Improve code organization and separation of concerns
+
 ## 0.1.5
 
 BUG FIXES:
