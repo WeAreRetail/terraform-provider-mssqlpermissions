@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 AWARE - Altogether We Are Retailers
+// SPDX-FileContributor: Cédric Ghiot <cedric@weareretail.ai>
+// SPDX-License-Identifier: MIT
+
 package provider
 
 // ErrorHandlingResult represents the decision of how to handle an error in a Read method

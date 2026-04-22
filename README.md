@@ -52,3 +52,7 @@ You can run the task using command line or the Visual Studio Code addon bundled 
 ```shell
 task terraform-up
 ```
+
+## Author
+
+Designed and developed by **Cédric Ghiot** ([cedric@weareretail.ai](mailto:cedric@weareretail.ai)) at **AWARE — Altogether We Are Retailers**.

@@ -6,7 +6,9 @@ basetypes
 blocksort
 booldefault
 boolplanmodifier
+Cédric
 chdir
+Ghiot
 cmds
 commandhistory
 coverprofile

@@ -1,5 +1,6 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-FileCopyrightText: 2024 AWARE - Altogether We Are Retailers
+// SPDX-FileContributor: Cédric Ghiot <cedric@weareretail.ai>
+// SPDX-License-Identifier: MIT
 
 //go:build tools
 

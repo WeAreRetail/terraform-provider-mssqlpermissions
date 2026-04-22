@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2024 AWARE - Altogether We Are Retailers
+// SPDX-FileContributor: Cédric Ghiot <cedric@weareretail.ai>
+// SPDX-License-Identifier: MIT
+
 package model
 
 // User is the model for the user object in the MSSQL server.
