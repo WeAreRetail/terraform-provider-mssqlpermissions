@@ -1,5 +1,5 @@
 # Inspiration: https://github.com/devcontainers/templates/blob/main/src/go-postgres/.devcontainer/Dockerfile
-ARG GO_TAG=2.0-bookworm
+ARG GO_TAG=2.1-bookworm
 FROM mcr.microsoft.com/devcontainers/go:${GO_TAG}
 
 # Tool versions
@@ -7,7 +7,7 @@ ARG REMOTE_USER=vscode
 ARG DELVE_VERSION=1.25.2
 ARG GOLANGCI_LINT_VERSION=v2.5.0
 ARG GORELEASER_VERSION=v2.11.2
-ARG GOPLS_VERSION=latest
+ARG GOPLS_VERSION=v0.21.1
 ARG STATICCHECK_VERSION=latest
 ARG SHFMT_VERSION=latest
 ARG GO_MOD_OUTDATED_VERSION=latest
