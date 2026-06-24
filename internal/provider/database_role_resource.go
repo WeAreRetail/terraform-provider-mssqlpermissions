@@ -6,6 +6,8 @@ package provider
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"terraform-provider-mssqlpermissions/internal/provider/model"
 	"terraform-provider-mssqlpermissions/internal/queries"
 	qmodel "terraform-provider-mssqlpermissions/internal/queries/model"
@@ -28,6 +30,68 @@ func NewDatabaseRoleResource() resource.Resource {
 
 type DatabaseRoleResource struct {
 	connector *queries.Connector
+}
+
+type databaseRoleCreateOperations interface {
+	GetDatabaseRole(ctx context.Context, db *sql.DB, databaseRole *qmodel.Role) (*qmodel.Role, error)
+	CreateDatabaseRole(ctx context.Context, db *sql.DB, databaseRole *qmodel.Role) error
+}
+
+type databaseRoleDeleteOperations interface {
+	GetDatabaseRole(ctx context.Context, db *sql.DB, databaseRole *qmodel.Role) (*qmodel.Role, error)
+	DeleteDatabaseRole(ctx context.Context, db *sql.DB, databaseRole *qmodel.Role) error
+}
+
+// ensureDatabaseRoleForCreate resolves a role for resource creation.
+// If the role already exists and is a standard role, an error is returned.
+// If the role already exists and is built-in, it is returned as-is.
+// If it does not exist, the role is created and read back.
+func ensureDatabaseRoleForCreate(ctx context.Context, connector databaseRoleCreateOperations, db *sql.DB, role *qmodel.Role) (*qmodel.Role, error) {
+	existingRole, _ := connector.GetDatabaseRole(ctx, db, role)
+
+	if existingRole == nil {
+		tflog.Debug(ctx, "Database role does not exist, creating role")
+		if err := connector.CreateDatabaseRole(ctx, db, role); err != nil {
+			return nil, fmt.Errorf("create role: %w", err)
+		}
+
+		createdRole, err := connector.GetDatabaseRole(ctx, db, role)
+		if err != nil {
+			return nil, fmt.Errorf("retrieve created role: %w", err)
+		}
+
+		return createdRole, nil
+	}
+
+	if existingRole.IsFixedRole {
+		tflog.Info(ctx, "Built-in database role is managed in state only, skipping create")
+		return existingRole, nil
+	}
+
+	return nil, fmt.Errorf("database role %q already exists", existingRole.Name)
+}
+
+func ensureDatabaseRoleDeleted(ctx context.Context, connector databaseRoleDeleteOperations, db *sql.DB, role *qmodel.Role) error {
+	existingRole, err := connector.GetDatabaseRole(ctx, db, role)
+	if err != nil {
+		if err.Error() == "database role not found" {
+			tflog.Debug(ctx, "Database role already absent, skipping delete")
+			return nil
+		}
+
+		return fmt.Errorf("get role for delete: %w", err)
+	}
+
+	if existingRole.IsFixedRole {
+		tflog.Info(ctx, "Built-in database role is managed in state only, skipping delete")
+		return nil
+	}
+
+	if err := connector.DeleteDatabaseRole(ctx, db, existingRole); err != nil {
+		return fmt.Errorf("delete role: %w", err)
+	}
+
+	return nil
 }
 
 // Configure is called by the framework to pass provider-level configuration to the resource.
@@ -130,15 +194,9 @@ func (r *DatabaseRoleResource) Create(ctx context.Context, req resource.CreateRe
 		Name: state.Name.ValueString(),
 	}
 
-	err = connector.CreateDatabaseRole(ctx, db, role)
+	role, err = ensureDatabaseRoleForCreate(ctx, connector, db, role)
 	if err != nil {
-		resp.Diagnostics.AddError("Error creating role", err.Error())
-		return
-	}
-
-	role, err = connector.GetDatabaseRole(ctx, db, role)
-	if err != nil {
-		resp.Diagnostics.AddError("Error retrieving the created role", err.Error())
+		resp.Diagnostics.AddError("Error ensuring database role", err.Error())
 		return
 	}
 
@@ -183,9 +241,9 @@ func (r *DatabaseRoleResource) Delete(ctx context.Context, req resource.DeleteRe
 		Name: state.Name.ValueString(),
 	}
 
-	err = connector.DeleteDatabaseRole(ctx, db, role)
+	err = ensureDatabaseRoleDeleted(ctx, connector, db, role)
 	if err != nil {
-		resp.Diagnostics.AddError("Error deleting role", err.Error())
+		resp.Diagnostics.AddError("Error ensuring role deletion", err.Error())
 		return
 	}
 
