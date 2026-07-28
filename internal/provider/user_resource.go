@@ -112,9 +112,16 @@ func (r *UserResource) Schema(_ context.Context, req resource.SchemaRequest, res
 				Computed:            true,
 			},
 			"object_id": schema.StringAttribute{
-				Description:         "The user object id.",
-				MarkdownDescription: "The user object id.",
-				Optional:            true,
+				Description: "The user object id. Changing it forces a new user.",
+				MarkdownDescription: "The Entra ID (Azure AD) object id of the principal, used to disambiguate it in " +
+					"`CREATE USER ... FROM EXTERNAL PROVIDER WITH OBJECT_ID`. It cannot be read back from " +
+					"`sys.database_principals`, so it is preserved from prior state rather than refreshed from the " +
+					"database. `ALTER USER` cannot rebind an existing user to a different principal, so changing it " +
+					"forces replacement.",
+				Optional: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"sid": schema.StringAttribute{
 				Description:         "The user SID.",
@@ -266,6 +273,10 @@ func (r *UserResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		Name:        state.Name.ValueString(),
 		PrincipalID: state.PrincipalID.ValueInt64(),
 		External:    state.External.ValueBool(),
+		// GetUser cannot recover ObjectID (sys.database_principals has no such column), and it only
+		// ever writes the fields it selects. Seeding it from prior state — as Create already does —
+		// keeps it from being dropped to null on every refresh.
+		ObjectID: state.ObjectID.ValueString(),
 	}
 
 	tflog.Debug(ctx, "Reading user from database")
@@ -339,6 +350,10 @@ func (r *UserResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		External:        state.External.ValueBool(),
 		DefaultSchema:   state.DefaultSchema.ValueString(),
 		DefaultLanguage: state.DefaultLanguage.ValueString(),
+		// Carried through from the plan for the same reason as in Read. Without it, GetUser below
+		// leaves ObjectID empty and the state write returns null for an attribute the plan declared,
+		// which Terraform/OpenTofu rejects as "Provider produced inconsistent result after apply".
+		ObjectID: state.ObjectID.ValueString(),
 	}
 
 	tflog.Debug(ctx, "Updating user")

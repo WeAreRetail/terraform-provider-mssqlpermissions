@@ -32,7 +32,7 @@ resource "mssqlpermissions_user" "user_resource" {
 - `default_language` (String) The user default language.
 - `default_schema` (String) The user default schema.
 - `external` (Boolean) Is the user external.
-- `object_id` (String) The user object id.
+- `object_id` (String) The Entra ID (Azure AD) object id of the principal, used to disambiguate it in `CREATE USER ... FROM EXTERNAL PROVIDER WITH OBJECT_ID`. It cannot be read back from `sys.database_principals`, so it is preserved from prior state rather than refreshed from the database. `ALTER USER` cannot rebind an existing user to a different principal, so changing it forces replacement.
 - `password` (String, Sensitive) The user password.
 
 ### Read-Only
