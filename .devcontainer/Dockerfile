@@ -1,5 +1,5 @@
 # Inspiration: https://github.com/devcontainers/templates/blob/main/src/go-postgres/.devcontainer/Dockerfile
-ARG GO_TAG=2.2-bookworm
+ARG GO_TAG=2.3-bookworm
 FROM mcr.microsoft.com/devcontainers/go:${GO_TAG}
 
 # Tool versions
